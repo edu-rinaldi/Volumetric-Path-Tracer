@@ -196,7 +196,7 @@ struct scene_data {
   vector<texture_data>     textures     = {};
   vector<material_data>    materials    = {};
   vector<subdiv_data>      subdivs      = {};
-
+  //vector<SDF>              implicits    = {};
   // names (this will be cleanup significantly later)
   vector<string> camera_names      = {};
   vector<string> texture_names     = {};
@@ -205,6 +205,7 @@ struct scene_data {
   vector<string> instance_names    = {};
   vector<string> environment_names = {};
   vector<string> subdiv_names      = {};
+  //vector<string> implicit_names    = {};
 
   // copyright info preserve in IO
   string copyright = "";

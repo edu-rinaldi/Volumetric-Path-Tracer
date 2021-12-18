@@ -339,6 +339,196 @@ static float sample_lights_pdf(const scene_data& scene, const bvh_data& bvh,
   return pdf;
 }
 
+// --- SDF ---
+
+class SDFEvaluation {
+ public:
+  inline SDFEvaluation unionOp(const SDFEvaluation& other) const {
+    return min(mD, other.mD);
+  }
+  inline SDFEvaluation subtractionOp(const SDFEvaluation& other) const {
+    return max(-mD, other.mD);
+  }
+
+  inline SDFEvaluation intersectionOp(const SDFEvaluation& other) const {
+    return max(mD, other.mD);
+  }
+
+  inline SDFEvaluation smoothUnionOp(
+      const SDFEvaluation& other, float k) const {
+    float h = clamp(0.5 + 0.5 * (other.mD - mD) / k, 0.0, 1.0);
+
+    return lerp(other.mD, mD, h) - k * h * (1.0 - h);
+  }
+  inline SDFEvaluation smoothSubtractionOp(
+      const SDFEvaluation& other, float k) const {
+    float h = clamp(0.5 - 0.5 * (other.mD + mD) / k, 0.0, 1.0);
+    return lerp(other.mD, -mD, h) + k * h * (1.0 - h);
+  }
+  inline SDFEvaluation opSmoothIntersection(
+      const SDFEvaluation& other, float k) const {
+    float h = clamp(0.5 - 0.5 * (other.mD - mD) / k, 0.0, 1.0);
+    return lerp(other.mD, mD, h) + k * h * (1.0 - h);
+  }
+
+  inline float eval() const { return mD; }
+
+  inline operator float() { return mD; }
+
+ private:
+  SDFEvaluation(float d) : mD(d) {}
+  float mD;
+  friend class SDF;
+};
+
+enum struct sdf_type {sphere};
+
+struct sdf_result {};
+
+struct sdf 
+{
+  sdf_type                                type;
+  std::function<sdf_result(const vec3f&)> f;
+};
+
+
+
+
+class SDF {
+ public:
+  SDF()                                              = delete;
+  virtual SDFEvaluation eval(const vec3f& pos) const = 0;
+
+ protected:
+  SDF(const vec3f& pos) : mPos(pos) {}
+  inline SDFEvaluation eval(float d) const { return d; }
+
+  vec3f mPos;
+};
+
+class SphereSDF : public SDF {
+ public:
+  SphereSDF(const vec3f& pos, float radius) : SDF(pos), mRadius(radius) {}
+  inline virtual SDFEvaluation eval(const vec3f& pos) const override {
+    return SDF::eval(length(pos - mPos) - mRadius);
+  }
+
+ private:
+  float mRadius;
+};
+
+bool spheretrace(const ray3f& ray, const std::vector<SDF*>& sdfs, float& dist) {
+  auto t = ray.tmin;
+  for (int i = 0; i < 150; ++i) {
+    if (t >= ray.tmax) return false;
+    auto  p = ray_point(ray, t);
+    auto& d = sdfs[0]->eval(p);
+    for (int i = 1; i < sdfs.size(); ++i) d = d.unionOp(sdfs[i]->eval(p));
+
+    if (d < yocto::flt_eps) {
+      dist = t;
+      return true;
+    }
+    t += d;
+  }
+
+  return false;
+}
+
+vec3f calcNormal(SDF& sdf, const vec3f& pos) {
+  vec3f n = zero3f;
+  for (int i = 0; i < 4; i++) {
+    vec3f e = 0.5773 * (2.0 * vec3f{(float)(((i + 3) >> 1) & 1),
+                                  (float)((i >> 1) & 1), (float)(i & 1)} -
+                           1.0f);
+    n += e * sdf.eval(pos + yocto::flt_eps * e);
+    // if( n.x+n.y+n.z>100.0 ) break;
+  }
+  return normalize(n);
+}
+// --- END SDF ---
+
+static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
+    const pathtrace_lights& lights, const ray3f& ray_, rng_state& rng,
+    const pathtrace_params& params) {
+  // initialize
+  auto radiance = vec3f{0, 0, 0};
+  auto weight   = vec3f{1, 1, 1};
+  auto ray      = ray_;
+  auto hit      = false;
+  auto sphere   = SphereSDF({-0.03, 0, 0}, 0.04);
+  auto sphere2  = SphereSDF({0, 0, 0}, 0.04);
+  auto sdfs     = std::vector<SDF*>{&sphere, &sphere2};
+  // trace  path
+  for (auto bounce = 0; bounce < params.bounces; bounce++) {
+    // intersect next point
+    float dist         = 0;
+    bool  intersection = spheretrace(ray, sdfs, dist);
+
+    if (!intersection) {
+      radiance += weight * eval_environment(scene, ray.d);
+      break;
+    }
+
+    // prepare shading point
+    auto outgoing = -ray.d;
+    auto position = ray_point(ray, dist);
+    auto normal   = calcNormal(sphere, position);
+    material_point material{};
+    material.type      = material_type::matte;
+    material.color     = {1, 0, 0};
+    material.opacity   = 1;
+    material.roughness = 0.3;
+    // handle opacity
+    if (material.opacity < 1 && rand1f(rng) >= material.opacity) {
+      ray = {position + ray.d * 1e-2f, ray.d};
+      bounce -= 1;
+      continue;
+    }
+
+    // set hit variables
+    if (bounce == 0) hit = true;
+
+    // accumulate emission
+    radiance += weight * eval_emission(material, normal, outgoing);
+
+    // next direction
+    auto incoming = vec3f{0, 0, 0};
+    if (!is_delta(material)) {
+      if (rand1f(rng) < 0.5f) {
+        incoming = sample_bsdfcos(
+            material, normal, outgoing, rand1f(rng), rand2f(rng));
+      } else {
+        incoming = sample_lights(
+            scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng));
+      }
+      if (incoming == vec3f{0, 0, 0}) break;
+      weight *=
+          eval_bsdfcos(material, normal, outgoing, incoming) /
+          (0.5f * sample_bsdfcos_pdf(material, normal, outgoing, incoming) +
+              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming));
+    } else {
+      incoming = sample_delta(material, normal, outgoing, rand1f(rng));
+      weight *= eval_delta(material, normal, outgoing, incoming) /
+                sample_delta_pdf(material, normal, outgoing, incoming);
+    }
+
+    // setup next iteration
+    ray = {position, incoming};
+    // check weight
+    if (weight == vec3f{0, 0, 0} || !isfinite(weight)) break;
+
+    // russian roulette
+    if (bounce > 3) {
+      auto rr_prob = min((float)0.99, max(weight));
+      if (rand1f(rng) >= rr_prob) break;
+      weight *= 1 / rr_prob;
+    }
+  }
+
+  return {radiance.x, radiance.y, radiance.z, 1};
+}
+
 // Recursive path tracing.
 static vec4f shade_volpathtrace(const scene_data& scene, const bvh_data& bvh,
     const pathtrace_lights& lights, const ray3f& ray_, rng_state& rng,
@@ -471,6 +661,8 @@ static vec4f shade_volpathtrace(const scene_data& scene, const bvh_data& bvh,
   return {radiance.x, radiance.y, radiance.z, hit ? 1.0f : 0.0f};
 }
 
+
+
 // Recursive path tracing.
 static vec4f shade_pathtrace(const scene_data& scene, const bvh_data& bvh,
     const pathtrace_lights& lights, const ray3f& ray_, rng_state& rng,
@@ -480,7 +672,6 @@ static vec4f shade_pathtrace(const scene_data& scene, const bvh_data& bvh,
   auto weight   = vec3f{1, 1, 1};
   auto ray      = ray_;
   auto hit      = false;
-
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
@@ -727,6 +918,7 @@ static pathtrace_shader_func get_shader(const pathtrace_params& params) {
     case pathtrace_shader_type::normal: return shade_normal;
     case pathtrace_shader_type::texcoord: return shade_texcoord;
     case pathtrace_shader_type::color: return shade_color;
+    case pathtrace_shader_type::implicit: return shade_implicit;
     default: {
       throw std::runtime_error("sampler unknown");
       return nullptr;

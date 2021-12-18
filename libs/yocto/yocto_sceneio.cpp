@@ -3550,6 +3550,15 @@ static bool load_json_scene(
         get_opt(element, "uri", uri);
       }
     }
+    /*if (json.contains("implicits")) {
+      auto& group = json.at("shapes");
+      scene.implicits.reserve(group.size());
+      scene.implicit_names.reserve(group.size());
+      for (auto& element : group)
+      {
+        auto& implicit = scene.implicits.emplace_back();
+      }
+    }*/
     if (json.contains("subdivs")) {
       auto& group = json.at("subdivs");
       scene.subdivs.reserve(group.size());
