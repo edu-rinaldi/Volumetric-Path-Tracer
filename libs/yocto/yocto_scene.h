@@ -143,6 +143,7 @@ struct instance_data {
   // instance data
   frame3f frame    = identity3x4f;
   int     shape    = invalidid;
+  int     implicit = invalidid;
   int     material = invalidid;
 };
 
@@ -187,16 +188,19 @@ struct subdiv_data {
 // environment. In that case, the element transforms are computed from
 // the hierarchy. Animation is also optional, with keyframe data that
 // updates node transformations only if defined.
+struct sdf_data;
+
 struct scene_data {
   // scene elements
-  vector<camera_data>      cameras      = {};
-  vector<instance_data>    instances    = {};
-  vector<environment_data> environments = {};
-  vector<shape_data>       shapes       = {};
-  vector<texture_data>     textures     = {};
-  vector<material_data>    materials    = {};
-  vector<subdiv_data>      subdivs      = {};
-  //vector<SDF>              implicits    = {};
+  vector<camera_data>      cameras             = {};
+  vector<instance_data>    instances           = {};
+  vector<environment_data> environments        = {};
+  vector<shape_data>       shapes              = {};
+  vector<texture_data>     textures            = {};
+  vector<material_data>    materials           = {};
+  vector<subdiv_data>      subdivs             = {};
+  vector<sdf_data*>        implicits           = {};
+  vector<instance_data>        implicits_instances = {};
   // names (this will be cleanup significantly later)
   vector<string> camera_names      = {};
   vector<string> texture_names     = {};
@@ -205,7 +209,7 @@ struct scene_data {
   vector<string> instance_names    = {};
   vector<string> environment_names = {};
   vector<string> subdiv_names      = {};
-  //vector<string> implicit_names    = {};
+  vector<string> implicit_names    = {};
 
   // copyright info preserve in IO
   string copyright = "";
@@ -312,10 +316,12 @@ vec4f eval_color(const scene_data& scene, const instance_data& instance,
 // Eval material to obtain emission, brdf and opacity.
 material_point eval_material(const scene_data& scene,
     const instance_data& instance, int element, const vec2f& uv);
+material_point eval_material(const scene_data& scene, const instance_data& instance);
 // check if a material has a volume
 bool is_volumetric(const scene_data& scene, const instance_data& instance);
 
 }  // namespace yocto
+
 
 // -----------------------------------------------------------------------------
 // ENVIRONMENT PROPERTIES
@@ -352,6 +358,8 @@ vector<string> scene_stats(const scene_data& scene, bool verbose = false);
 // Return validation errors as list of strings.
 vector<string> scene_validation(
     const scene_data& scene, bool notextures = false);
+
+void make_sdf_from_type(sdf_data& sdf);
 
 }  // namespace yocto
 

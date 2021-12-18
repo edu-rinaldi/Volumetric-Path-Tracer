@@ -30,6 +30,7 @@
 #include <yocto/yocto_math.h>
 #include <yocto/yocto_parallel.h>
 #include <yocto/yocto_scene.h>
+#include <yocto/yocto_sdfs.h>
 #include <yocto/yocto_sceneio.h>
 #include <yocto/yocto_shape.h>
 #include <yocto_gui/yocto_glview.h>
@@ -46,6 +47,11 @@ void run_offline(const string& filename, const string& output,
   auto error = string{};
   auto scene = scene_data{};
   if (!load_scene(filename, scene, error)) print_fatal(error);
+  
+  sdf_sphere* sphere1 = new sdf_sphere{};
+  sphere1->radius = 0.04f;
+  scene.implicits.push_back(sphere1);
+
   print_progress_end();
 
   // camera
@@ -94,6 +100,33 @@ void run_interactive(const string& filename, const string& output,
   auto error = string{};
   auto scene = scene_data{};
   if (!load_scene(filename, scene, error)) print_fatal(error);
+  auto sphere1 = std::make_unique<sdf_sphere>();
+  sphere1->radius = 0.04f;
+
+  scene.implicits.push_back(sphere1.get());
+  
+  instance_data sphere1_inst;
+  sphere1_inst.implicit = scene.implicits.size() - 1;
+  sphere1_inst.material = 2;
+  sphere1_inst.frame.o  = {0, 0.05, 0};
+  
+  scene.implicits_instances.push_back(sphere1_inst);
+
+  auto sphere2    = std::make_unique<sdf_box>();
+  //sphere2->radius = 0.04f;
+  sphere2->height = 0.001;
+  sphere2->width  = 0.5;
+  sphere2->depth  = 0.5;
+
+
+  scene.implicits.push_back(sphere2.get());
+
+  instance_data sphere2_inst;
+  sphere2_inst.implicit = scene.implicits.size() - 1;
+  sphere2_inst.frame    = rotation_frame({0, 0, 1}, radians(90.f));
+  sphere2_inst.material = 0;
+  scene.implicits_instances.push_back(sphere2_inst);
+  
   print_progress_end();
 
   // camera

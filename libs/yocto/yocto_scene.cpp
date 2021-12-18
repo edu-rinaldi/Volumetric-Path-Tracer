@@ -578,12 +578,55 @@ material_point eval_material(const scene_data& scene,
   return point;
 }
 
+material_point eval_material(
+    const scene_data& scene, const instance_data& instance) {
+  auto& material = scene.materials[instance.material];
+
+  // material point
+  auto point         = material_point{};
+  point.type         = material.type;
+  point.emission     = material.emission;
+  point.color        = material.color;
+  point.opacity      = material.opacity;
+  point.metallic     = material.metallic;
+  point.roughness    = material.roughness;
+  point.roughness    = point.roughness * point.roughness;
+  point.ior          = material.ior;
+  point.scattering   = material.scattering;
+  point.scanisotropy = material.scanisotropy;
+  point.trdepth      = material.trdepth;
+
+  // volume density
+  if (material.type == material_type::refractive ||
+      material.type == material_type::volumetric ||
+      material.type == material_type::subsurface) {
+    point.density = -log(clamp(point.color, 0.0001f, 1.0f)) / point.trdepth;
+  } else {
+    point.density = {0, 0, 0};
+  }
+
+  // fix roughness
+  if (point.type == material_type::matte ||
+      point.type == material_type::gltfpbr ||
+      point.type == material_type::glossy) {
+    point.roughness = clamp(point.roughness, min_roughness, 1.0f);
+  } else if (material.type == material_type::volumetric) {
+    point.roughness = 0;
+  } else {
+    if (point.roughness < min_roughness) point.roughness = 0;
+  }
+
+  return point;
+}
+
 // check if an instance is volumetric
 bool is_volumetric(const scene_data& scene, const instance_data& instance) {
   return is_volumetric(scene.materials[instance.material]);
 }
 
 }  // namespace yocto
+
+
 
 // -----------------------------------------------------------------------------
 // ENVIRONMENT PROPERTIES
@@ -943,6 +986,7 @@ vector<string> scene_validation(const scene_data& scene, bool notextures) {
 
   return errs;
 }
+
 
 }  // namespace yocto
 

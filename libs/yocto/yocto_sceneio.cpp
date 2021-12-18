@@ -3551,12 +3551,17 @@ static bool load_json_scene(
       }
     }
     /*if (json.contains("implicits")) {
-      auto& group = json.at("shapes");
+      auto& group = json.at("implicits");
       scene.implicits.reserve(group.size());
       scene.implicit_names.reserve(group.size());
       for (auto& element : group)
       {
         auto& implicit = scene.implicits.emplace_back();
+        auto& name     = scene.implicit_names.emplace_back();
+        sdf_type type;
+        get_opt(element, "name", name);
+        get_opt(element, "type", type);
+
       }
     }*/
     if (json.contains("subdivs")) {

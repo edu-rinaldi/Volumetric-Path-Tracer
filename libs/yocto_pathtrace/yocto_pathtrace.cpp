@@ -34,6 +34,7 @@
 #include <yocto/yocto_sampling.h>
 #include <yocto/yocto_shading.h>
 #include <yocto/yocto_shape.h>
+#include <yocto/yocto_sdfs.h>
 
 // -----------------------------------------------------------------------------
 // IMPLEMENTATION FOR PATH TRACING
@@ -341,90 +342,14 @@ static float sample_lights_pdf(const scene_data& scene, const bvh_data& bvh,
 
 // --- SDF ---
 
-class SDFEvaluation {
- public:
-  inline SDFEvaluation unionOp(const SDFEvaluation& other) const {
-    return min(mD, other.mD);
-  }
-  inline SDFEvaluation subtractionOp(const SDFEvaluation& other) const {
-    return max(-mD, other.mD);
-  }
-
-  inline SDFEvaluation intersectionOp(const SDFEvaluation& other) const {
-    return max(mD, other.mD);
-  }
-
-  inline SDFEvaluation smoothUnionOp(
-      const SDFEvaluation& other, float k) const {
-    float h = clamp(0.5 + 0.5 * (other.mD - mD) / k, 0.0, 1.0);
-
-    return lerp(other.mD, mD, h) - k * h * (1.0 - h);
-  }
-  inline SDFEvaluation smoothSubtractionOp(
-      const SDFEvaluation& other, float k) const {
-    float h = clamp(0.5 - 0.5 * (other.mD + mD) / k, 0.0, 1.0);
-    return lerp(other.mD, -mD, h) + k * h * (1.0 - h);
-  }
-  inline SDFEvaluation opSmoothIntersection(
-      const SDFEvaluation& other, float k) const {
-    float h = clamp(0.5 - 0.5 * (other.mD - mD) / k, 0.0, 1.0);
-    return lerp(other.mD, mD, h) + k * h * (1.0 - h);
-  }
-
-  inline float eval() const { return mD; }
-
-  inline operator float() { return mD; }
-
- private:
-  SDFEvaluation(float d) : mD(d) {}
-  float mD;
-  friend class SDF;
-};
-
-enum struct sdf_type {sphere};
-
-struct sdf_result {};
-
-struct sdf 
+bool spheretrace(const scene_data& scene, const instance_data& sdf_instance,
+    const ray3f& ray, float& dist) 
 {
-  sdf_type                                type;
-  std::function<sdf_result(const vec3f&)> f;
-};
-
-
-
-
-class SDF {
- public:
-  SDF()                                              = delete;
-  virtual SDFEvaluation eval(const vec3f& pos) const = 0;
-
- protected:
-  SDF(const vec3f& pos) : mPos(pos) {}
-  inline SDFEvaluation eval(float d) const { return d; }
-
-  vec3f mPos;
-};
-
-class SphereSDF : public SDF {
- public:
-  SphereSDF(const vec3f& pos, float radius) : SDF(pos), mRadius(radius) {}
-  inline virtual SDFEvaluation eval(const vec3f& pos) const override {
-    return SDF::eval(length(pos - mPos) - mRadius);
-  }
-
- private:
-  float mRadius;
-};
-
-bool spheretrace(const ray3f& ray, const std::vector<SDF*>& sdfs, float& dist) {
   auto t = ray.tmin;
   for (int i = 0; i < 150; ++i) {
     if (t >= ray.tmax) return false;
     auto  p = ray_point(ray, t);
-    auto& d = sdfs[0]->eval(p);
-    for (int i = 1; i < sdfs.size(); ++i) d = d.unionOp(sdfs[i]->eval(p));
-
+    auto& d = eval_sdf(scene, sdf_instance, p).dist;
     if (d < yocto::flt_eps) {
       dist = t;
       return true;
@@ -435,17 +360,6 @@ bool spheretrace(const ray3f& ray, const std::vector<SDF*>& sdfs, float& dist) {
   return false;
 }
 
-vec3f calcNormal(SDF& sdf, const vec3f& pos) {
-  vec3f n = zero3f;
-  for (int i = 0; i < 4; i++) {
-    vec3f e = 0.5773 * (2.0 * vec3f{(float)(((i + 3) >> 1) & 1),
-                                  (float)((i >> 1) & 1), (float)(i & 1)} -
-                           1.0f);
-    n += e * sdf.eval(pos + yocto::flt_eps * e);
-    // if( n.x+n.y+n.z>100.0 ) break;
-  }
-  return normalize(n);
-}
 // --- END SDF ---
 
 static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
@@ -456,15 +370,21 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
   auto weight   = vec3f{1, 1, 1};
   auto ray      = ray_;
   auto hit      = false;
-  auto sphere   = SphereSDF({-0.03, 0, 0}, 0.04);
-  auto sphere2  = SphereSDF({0, 0, 0}, 0.04);
-  auto sdfs     = std::vector<SDF*>{&sphere, &sphere2};
+  
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
     float dist         = 0;
-    bool  intersection = spheretrace(ray, sdfs, dist);
-
+    bool  intersection = false;
+    int   instance;
+    for (const auto& [i, inst] : enumerate(scene.implicits_instances)) {
+      if (inst.implicit == invalidid) continue;
+      intersection = spheretrace(scene, inst, ray, dist);
+      if (intersection) {
+        instance = i;
+        break;
+      }
+    }
     if (!intersection) {
       radiance += weight * eval_environment(scene, ray.d);
       break;
@@ -473,12 +393,8 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
     // prepare shading point
     auto outgoing = -ray.d;
     auto position = ray_point(ray, dist);
-    auto normal   = calcNormal(sphere, position);
-    material_point material{};
-    material.type      = material_type::matte;
-    material.color     = {1, 0, 0};
-    material.opacity   = 1;
-    material.roughness = 0.3;
+    auto normal   = eval_sdf_normal(scene, scene.implicits_instances[instance], position);
+    auto& material = eval_material(scene, scene.implicits_instances[instance]);
     // handle opacity
     if (material.opacity < 1 && rand1f(rng) >= material.opacity) {
       ray = {position + ray.d * 1e-2f, ray.d};
