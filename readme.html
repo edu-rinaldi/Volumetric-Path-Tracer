@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+    /*! normalize.css v2.1.0 | MIT License | git.io/normalize */
+
+/* ==========================================================================
+   HTML5 display definitions
+   ========================================================================== */
+
+/**
+ * Correct `block` display not defined in IE 8/9.
+ */
+
+article,
+aside,
+details,
+figcaption,
+figure,
+footer,
+header,
+hgroup,
+main,
+nav,
+section,
+summary {
+    display: block;
+}
+
+/**
+ * Correct `inline-block` display not defined in IE 8/9.
+ */
+
+audio,
+canvas,
+video {
+    display: inline-block;
+}
+
+/**
+ * Prevent modern browsers from displaying `audio` without controls.
+ * Remove excess height in iOS 5 devices.
+ */
+
+audio:not([controls]) {
+    display: none;
+    height: 0;
+}
+
+/**
+ * Address styling not present in IE 8/9.
+ */
+
+[hidden] {
+    display: none;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+/**
+ * 1. Set default font family to sans-serif.
+ * 2. Prevent iOS text size adjust after orientation change, without disabling
+ *    user zoom.
+ */
+
+html {
+    font-family: sans-serif; /* 1 */
+    -webkit-text-size-adjust: 100%; /* 2 */
+    -ms-text-size-adjust: 100%; /* 2 */
+}
+
+/**
+ * Remove default margin.
+ */
+
+body {
+    margin: 0;
+}
+
+/* ==========================================================================
+   Links
+   ========================================================================== */
+
+/**
+ * Address `outline` inconsistency between Chrome and other browsers.
+ */
+
+a:focus {
+    outline: thin dotted;
+}
+
+/**
+ * Improve readability when focused and also mouse hovered in all browsers.
+ */
+
+a:active,
+a:hover {
+    outline: 0;
+}
+
+/* ==========================================================================
+   Typography
+   ========================================================================== */
+
+/**
+ * Address variable `h1` font-size and margin within `section` and `article`
+ * contexts in Firefox 4+, Safari 5, and Chrome.
+ */
+
+h1 {
+    font-size: 2em;
+    margin: 0.67em 0;
+}
+
+/**
+ * Address styling not present in IE 8/9, Safari 5, and Chrome.
+ */
+
+abbr[title] {
+    border-bottom: 1px dotted;
+}
+
+/**
+ * Address style set to `bolder` in Firefox 4+, Safari 5, and Chrome.
+ */
+
+b,
+strong {
+    font-weight: bold;
+}
+
+/**
+ * Address styling not present in Safari 5 and Chrome.
+ */
+
+dfn {
+    font-style: italic;
+}
+
+/**
+ * Address differences between Firefox and other browsers.
+ */
+
+hr {
+    -moz-box-sizing: content-box;
+    box-sizing: content-box;
+    height: 0;
+}
+
+/**
+ * Address styling not present in IE 8/9.
+ */
+
+mark {
+    background: #ff0;
+    color: #000;
+}
+
+/**
+ * Correct font family set oddly in Safari 5 and Chrome.
+ */
+
+code,
+kbd,
+pre,
+samp {
+    font-family: monospace, serif;
+    font-size: 1em;
+}
+
+/**
+ * Improve readability of pre-formatted text in all browsers.
+ */
+
+pre {
+    white-space: pre-wrap;
+}
+
+/**
+ * Set consistent quote types.
+ */
+
+q {
+    quotes: "\201C" "\201D" "\2018" "\2019";
+}
+
+/**
+ * Address inconsistent and variable font size in all browsers.
+ */
+
+small {
+    font-size: 80%;
+}
+
+/**
+ * Prevent `sub` and `sup` affecting `line-height` in all browsers.
+ */
+
+sub,
+sup {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+}
+
+sup {
+    top: -0.5em;
+}
+
+sub {
+    bottom: -0.25em;
+}
+
+/* ==========================================================================
+   Embedded content
+   ========================================================================== */
+
+/**
+ * Remove border when inside `a` element in IE 8/9.
+ */
+
+img {
+    border: 0;
+}
+
+/**
+ * Correct overflow displayed oddly in IE 9.
+ */
+
+svg:not(:root) {
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   Figures
+   ========================================================================== */
+
+/**
+ * Address margin not present in IE 8/9 and Safari 5.
+ */
+
+figure {
+    margin: 0;
+}
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+
+/**
+ * Define consistent border, margin, and padding.
+ */
+
+fieldset {
+    border: 1px solid #c0c0c0;
+    margin: 0 2px;
+    padding: 0.35em 0.625em 0.75em;
+}
+
+/**
+ * 1. Correct `color` not being inherited in IE 8/9.
+ * 2. Remove padding so people aren't caught out if they zero out fieldsets.
+ */
+
+legend {
+    border: 0; /* 1 */
+    padding: 0; /* 2 */
+}
+
+/**
+ * 1. Correct font family not being inherited in all browsers.
+ * 2. Correct font size not being inherited in all browsers.
+ * 3. Address margins set differently in Firefox 4+, Safari 5, and Chrome.
+ */
+
+button,
+input,
+select,
+textarea {
+    font-family: inherit; /* 1 */
+    font-size: 100%; /* 2 */
+    margin: 0; /* 3 */
+}
+
+/**
+ * Address Firefox 4+ setting `line-height` on `input` using `!important` in
+ * the UA stylesheet.
+ */
+
+button,
+input {
+    line-height: normal;
+}
+
+/**
+ * Address inconsistent `text-transform` inheritance for `button` and `select`.
+ * All other form control elements do not inherit `text-transform` values.
+ * Correct `button` style inheritance in Chrome, Safari 5+, and IE 8+.
+ * Correct `select` style inheritance in Firefox 4+ and Opera.
+ */
+
+button,
+select {
+    text-transform: none;
+}
+
+/**
+ * 1. Avoid the WebKit bug in Android 4.0.* where (2) destroys native `audio`
+ *    and `video` controls.
+ * 2. Correct inability to style clickable `input` types in iOS.
+ * 3. Improve usability and consistency of cursor style between image-type
+ *    `input` and others.
+ */
+
+button,
+html input[type="button"], /* 1 */
+input[type="reset"],
+input[type="submit"] {
+    -webkit-appearance: button; /* 2 */
+    cursor: pointer; /* 3 */
+}
+
+/**
+ * Re-set default cursor for disabled elements.
+ */
+
+button[disabled],
+html input[disabled] {
+    cursor: default;
+}
+
+/**
+ * 1. Address box sizing set to `content-box` in IE 8/9.
+ * 2. Remove excess padding in IE 8/9.
+ */
+
+input[type="checkbox"],
+input[type="radio"] {
+    box-sizing: border-box; /* 1 */
+    padding: 0; /* 2 */
+}
+
+/**
+ * 1. Address `appearance` set to `searchfield` in Safari 5 and Chrome.
+ * 2. Address `box-sizing` set to `border-box` in Safari 5 and Chrome
+ *    (include `-moz` to future-proof).
+ */
+
+input[type="search"] {
+    -webkit-appearance: textfield; /* 1 */
+    -moz-box-sizing: content-box;
+    -webkit-box-sizing: content-box; /* 2 */
+    box-sizing: content-box;
+}
+
+/**
+ * Remove inner padding and search cancel button in Safari 5 and Chrome
+ * on OS X.
+ */
+
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+    -webkit-appearance: none;
+}
+
+/**
+ * Remove inner padding and border in Firefox 4+.
+ */
+
+button::-moz-focus-inner,
+input::-moz-focus-inner {
+    border: 0;
+    padding: 0;
+}
+
+/**
+ * 1. Remove default vertical scrollbar in IE 8/9.
+ * 2. Improve readability and alignment in all browsers.
+ */
+
+textarea {
+    overflow: auto; /* 1 */
+    vertical-align: top; /* 2 */
+}
+
+/* ==========================================================================
+   Tables
+   ========================================================================== */
+
+/**
+ * Remove most spacing between table cells.
+ */
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+@import url(http://fonts.googleapis.com/css?family=Open+Sans:400,700|Inconsolata:400,700);
+
+html {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    margin: 0 auto;
+    padding: 0;
+    width: 600px;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 16px;
+    line-height: 24px;
+}
+
+h1 {
+    font-size: 32px;
+    line-height: 48px;
+    margin: 144px 0 24px 0;
+}
+
+h2 {
+    font-size: 28px;
+    line-height: 48px;
+    margin: 0 0 24px 0;
+}
+
+h3 {
+    font-size: 22px;
+    line-height: 24px;
+    margin: 48px 0 24px 0;
+}
+
+p, ul {
+    margin: 0 0 24px 0;
+}
+
+ul ul {
+    margin: 0 0 0 0;
+}
+
+pre {
+    margin: 0 0 24px 0;
+}
+
+code {
+    font-family: Inconsolata, monospace;
+}
+
+@media print {
+    body {
+        margin: 72px 72px;
+    }
+    @page {
+        margin: 48px 48px;
+    }
+}
+
+    </style>
+</head>
+<body>
+    <h1>Yocto/Pathtrace: Tiny Volumetric Path Tracer</h1>
+<p>In this homework, you will learn how to build a simple path tracer with support
+for subdivision surfaces, displacement and subsurface scattering.
+In particular, you will learn how to</p>
+<ul>
+<li>handle subdivision surfaces,</li>
+<li>handle normal mapping (we have implemented displacement for you),</li>
+<li>write a path tracer with support for homogeneous volumes.</li>
+</ul>
+<h2>Framework</h2>
+<p>The code uses the library <a href="https://github.com/xelatihy/yocto-gl">Yocto/GL</a>,
+that is included in this project in the directory <code>yocto</code>.
+We suggest to consult the documentation for the library that you can find
+at the beginning of the header files. Also, since the library is getting improved
+during the duration of the course, se suggest that you star it and watch it
+on Github, so that you can notified as improvements are made.</p>
+<p>In order to compile the code, you have to install
+<a href="https://apps.apple.com/it/app/xcode/id497799835?mt=12">Xcode</a>
+on OsX, <a href="https://visualstudio.microsoft.com/it/vs/">Visual Studio 2019</a> on Windows,
+or a modern version of gcc or clang on Linux,
+together with the tools <a href="www.cmake.org">cmake</a> and <a href="https://ninja-build.org">ninja</a>.
+The script <code>scripts/build.sh</code> will perform a simple build on OsX.
+As discussed in class, we prefer to use
+<a href="https://code.visualstudio.com">Visual Studio Code</a>, with
+<a href="https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools">C/C++</a> and
+<a href="https://marketplace.visualstudio.com/items?itemName=ms-vscode.cmake-tools">CMake Tools</a>
+extensions, that we have configured to use for this course.</p>
+<p>You will write your code in the file <code>yocto_pathtrace.cpp</code> for functions that
+are declared in <code>yocto_pathtrace.h</code>. Your renderer is called by <code>yscenetrace.cpp</code>
+for a command-line interface and <code>ysceneitraces.cpp</code> that show a simple
+user interface.</p>
+<p>This repository also contains tests that are executed from the command line
+as shown in <code>run.sh</code>. The rendered images are saved in the <code>out/</code> directory.
+The results should match the ones in the directory <code>check/</code>.</p>
+<h2>Functionality (24 punti)</h2>
+<p>In this homework you will implement the following features:</p>
+<ul>
+<li><strong>Subdivision Surfaces</strong> in function <code>tesselate_surface()</code>:<ul>
+<li>implement Catmull-Clark subdivision following the slides</li>
+<li>while the solution should match the one in Yocto/Shape, your
+  implementation <em>cannot</em> use the Yocto one, neither calling it nor
+  adapting the code – I will be able to tell since the Yocto/Shape code
+  supports more features</li>
+</ul>
+</li>
+<li><strong>Volumetric Path Tracing</strong> in function <code>shade_volpathtrace()</code>:<ul>
+<li>follow the slides and implement a volumetric path tracer</li>
+<li>you have to also implement all support functions</li>
+<li>you can use the corresponding functions in Yocto/GL</li>
+</ul>
+</li>
+</ul>
+<h2>Extra Credit (16 punti)</h2>
+<p>As usual, here are the extra credit work you can choose to do. As before,
+the maximum points sum is the one reported above. But you can do more of these
+if desired.</p>
+<p>New this time is that if you do extra credit, you have to <strong>prepare a short PDF</strong>
+that describes which feature you have implemented and includes images for
+those features. <strong>Without the PDF the extra credit will not be graded</strong>.
+The PDF should be very short and just say what you did succinctly, like with
+a bullet points lists.</p>
+<ul>
+<li><strong>Shadow Terminator</strong> (simple):<ul>
+<li>implement the shadow terminator fix shown in
+  <a href="https://link.springer.com/content/pdf/10.1007%2F978-1-4842-7185-8.pdf">Raytracing Gem 2 - Chapter 4</a></li>
+<li>show images that compare Yocto/GL to your solution</li>
+</ul>
+</li>
+<li><strong>Path Tracing Implicit</strong> (medium):<ul>
+<li>write a path tracer that can render implicit surfaces</li>
+<li>follow the intersection code in [] and the speedup technique in []</li>
+<li>you can keep all shading as is, just change the intersection methods</li>
+</ul>
+</li>
+<li><strong>Better Sampling Sequence</strong> (medium):<ul>
+<li>add a method to generate well distributed samples based on
+  <a href="http://abdallagafar.com/publications/zsampler/">ZSampler</a></li>
+<li>follow the implementation in <a href="https://github.com/mmp/pbrt-v4">pbrt-v4</a></li>
+<li>demonstrate the method with direct illumination of area lights</li>
+</ul>
+</li>
+<li><strong>Volumetric Path Tracing I - Delta Tracking</strong> in path tracer (hard):<ul>
+<li>integrate delta tracking for smoke and clouds, based your implementation on
+  <a href="http://www.pbr-book.org/3ed-2018/Light_Transport_II_Volume_Rendering/Sampling_Volume_Scattering.html">pbrt</a></li>
+<li>to integrate it, you have to implement a new <code>sample_transmittance()</code>
+  that both samples the distances and returns the weight</li>
+<li>implement volumetric textures, by creating a 3d <code>volume_data</code> structure
+  or by using NVidia <code>nanovdb</code></li>
+<li>also you have to add volumes to the renderer, which for now can be a hack
+  to either hardcode a function that makes one or use example data from OpenVDB</li>
+</ul>
+</li>
+<li><strong>Volumetric Path Tracing II - Modernized Volumetric Scattering</strong> (very hard):<ul>
+<li>implement proper volumetric scattering for heterogenous materials</li>
+<li>implement volumetric textures, by creating a 3d <code>volume_data</code> structure
+  or by using NVidia <code>nanovdb</code></li>
+<li>add these textures to both the SceneIO loader and the path tracer</li>
+<li>implement a modern volumetric method from Algorithm 1 of <a href="https://cs.dartmouth.edu/~wjarosz/publications/miller19null.html">Miller et al</a> --- ignore most of the math here since it is not that helpful</li>
+<li>you can use the implementation from <a href="https://github.com/mmp/pbrt-v4">pbrt-v4</a></li>
+<li>also you have to add volumes to the renderer, which for now can be a hack
+  to either hardcode a function that makes one or use example data from OpenVDB</li>
+</ul>
+</li>
+<li><strong>GPU Path Tracing</strong> on your system (hard):<ul>
+<li>implement a path tracer on the GPU that is equivalent to homework 02</li>
+<li>you can use any rendering API you want since it all depends on the hardware you have</li>
+<li>in particular, I suggest using Metal on OsX, OptiX/Owl on NVidia hardware,
+  and DirectX Ray tracing on Windows (I am not familiar with Linux enough to give suggestions)</li>
+<li>follow a demo/tutorial that vendors provide with your system and modify it
+  to render with Yocto with the same algorithm we used</li>
+</ul>
+</li>
+<li><strong>Path Tracing in Python</strong> (hard):<ul>
+<li>implement a path tracer in Python to see how performant the code remains</li>
+<li>the path tracer should load Yocto/GL scenes so you can compare the execution times</li>
+<li>to make it bearable I suggest that you<ul>
+<li>use numpy for all data</li>
+<li>use any library you like to load the JSON scene and its components</li>
+<li>write a wavefront path tracer that executes functions over all the image<ul>
+<li>first generate rays for all pixels</li>
+<li>then intersect the scene for all rays</li>
+<li>then executes the materials to generate more rays</li>
+<li>rinse-and-repeat</li>
+<li>use numpy buffers between stages</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Yacta/GL</strong> (hard):<ul>
+<li>Yocto/GL tries to be as small as possible to make understandable and hackable,
+  but doing so it does not leverage the latest libraries</li>
+<li>try to build a renderer using off-the-shelf open source libraries like<ul>
+<li>Intel Embree for raytracing</li>
+<li>Intel Open Image Denoise for denoising</li>
+<li>Pixar Open Subdiv for surfaces</li>
+<li>MaterialX for materials</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2>Submission</h2>
+<p>To submit the homework, you need to pack a ZIP file that contains the code
+you write and the images it generates, i.e. the ZIP <em>with only the
+<code>yocto_pathtrace/</code> and <code>out/</code> directories</em>. <em>If doing extra credits also include
+the PDF and and the test scenes.</em>
+If you are doing extra credit, include also <code>apps</code>, other images, and a 
+<strong><code>readme.md</code></strong> file that describes the list of implemented extra credit.
+The file should be called <code>&lt;lastname&gt;_&lt;firstname&gt;_&lt;studentid&gt;.zip</code>
+(<code>&lt;cognome&gt;_&lt;nome&gt;_&lt;matricola&gt;.zip</code>) and you should exclude
+all other directories. Send it on Google Classroom.</p>
+</body>
+</html>

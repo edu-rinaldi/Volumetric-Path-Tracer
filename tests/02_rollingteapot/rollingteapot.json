@@ -1,0 +1,141 @@
+{
+  "asset": {
+    "copyright": "Model by Brice Laville from RenderMan \"Rolling Teapot\" Art Challenge",
+    "version": "4.2"
+  },
+  "cameras": [
+    {
+      "name": "default",
+      "lens": 0.05,
+      "aperture": 0.0,
+      "aspect": 2.4,
+      "frame": [
+        0.8151804208755493, -0.0, 0.579207181930542, 0.16660168766975403,
+        0.9577393531799316, -0.23447643220424652, -0.5547295212745667,
+        0.28763750195503235, 0.7807304263114929, -0.75, 0.4000000059604645,
+        0.8999999761581421
+      ]
+    }
+  ],
+  "environments": [
+    {
+      "name": "sky",
+      "emission": [0.5, 0.5, 0.5],
+      "emission_tex": 1
+    }
+  ],
+  "textures": [
+    {
+      "name": "floor",
+      "uri": "textures/floor.png"
+    },
+    {
+      "name": "sky",
+      "uri": "textures/sky.hdr"
+    }
+  ],
+  "materials": [
+    {
+      "name": "floor",
+      "color": [0.7, 0.7, 0.7],
+      "color_tex": 0,
+      "specular": 0,
+      "type": "matte"
+    },
+    {
+      "name": "rollingteapot-shape",
+      "color": [0.5, 0.5, 0.5],
+      "roughness": 0.003,
+      "type": "glossy"
+    },
+    {
+      "name": "rollingteapot-subdiv",
+      "color": [0.5, 0.5, 0.5],
+      "roughness": 0.003,
+      "type": "glossy"
+    },
+    {
+      "name": "arealight1",
+      "emission": [20, 20, 20],
+      "type": "matte"
+    },
+    {
+      "name": "arealight2",
+      "emission": [20, 20, 20],
+      "type": "matte"
+    }
+  ],
+  "shapes": [
+    {
+      "name": "floor",
+      "uri": "shapes/floor.ply"
+    },
+    {
+      "name": "rollingteapot-shape",
+      "uri": "shapes/rollingteapot-shape.obj"
+    },
+    {
+      "name": "rollingteapot-subdiv",
+      "uri": "shapes/rollingteapot-subdiv.obj"
+    },
+    {
+      "name": "arealight1",
+      "uri": "shapes/arealight1.ply"
+    },
+    {
+      "name": "arealight2",
+      "uri": "shapes/arealight2.ply"
+    }
+  ],
+  "subdivs": [
+    {
+      "name": "rollingteapot-subdiv",
+      "shape": 2,
+      "datafile": "rollingteapot-subdiv.obj",
+      "subdivisions": 1,
+      "smooth": true,
+      "uri": "subdivs/rollingteapot-subdiv.obj"
+    }
+  ],
+  "instances": [
+    {
+      "name": "floor",
+      "shape": 0,
+      "material": 0
+    },
+    {
+      "name": "rollingteapot-shape",
+      "frame": [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+      "shape": 1,
+      "material": 1
+    },
+    {
+      "name": "rollingteapot-subdiv",
+      "frame": [1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3, 0, 0],
+      "shape": 2,
+      "material": 2
+    },
+    {
+      "name": "arealight1",
+      "frame": [
+        0.8944271802902222, -0.0, 0.4472135901451111, 0.27562475204467773,
+        0.7874992489814758, -0.5512495040893555, -0.3521803617477417,
+        0.6163156628608704, 0.7043607234954834, -0.4000000059604645,
+        0.800000011920929, 0.800000011920929
+      ],
+      "shape": 3,
+      "material": 3
+    },
+    {
+      "name": "arealight2",
+      "frame": [
+        0.8944271802902222, 0.0, -0.4472135901451111, -0.27562475204467773,
+        0.7874992489814758, -0.5512495040893555, 0.3521803617477417,
+        0.6163156628608704, 0.7043607234954834, 0.4000000059604645,
+        0.800000011920929, 0.800000011920929
+      ],
+      "shape": 4,
+      "material": 4
+    }
+  ]
+}
