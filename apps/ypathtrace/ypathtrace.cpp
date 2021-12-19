@@ -100,32 +100,47 @@ void run_interactive(const string& filename, const string& output,
   auto error = string{};
   auto scene = scene_data{};
   if (!load_scene(filename, scene, error)) print_fatal(error);
-  auto sphere1 = std::make_unique<sdf_sphere>();
-  sphere1->radius = 0.04f;
+  auto sphere1 = std::make_shared<sdf_sphere>();
+  sphere1->radius = 0.052f;
 
-  scene.implicits.push_back(sphere1.get());
+  auto box = std::make_unique<sdf_box>();
+  box->whd = vec3f{0.05, 0.05, 0.05};
+
+  auto prova = std::make_unique<sdf_union<2>>();
+  prova->functions[0] = sphere1.get();
+  prova->functions[1] = box.get();
+
+  scene.implicits.push_back(prova.get());
   
-  instance_data sphere1_inst;
-  sphere1_inst.implicit = scene.implicits.size() - 1;
-  sphere1_inst.material = 2;
-  sphere1_inst.frame.o  = {0, 0.05, 0};
+  instance_data tinst;
+  tinst.implicit        = scene.implicits.size() - 1;
+  tinst.material        = 3;
+  tinst.frame           = translation_frame(vec3f{0, 0.05, 0});
   
-  scene.implicits_instances.push_back(sphere1_inst);
+  scene.implicits_instances.push_back(tinst);
 
-  auto sphere2    = std::make_unique<sdf_box>();
-  //sphere2->radius = 0.04f;
-  sphere2->height = 0.001;
-  sphere2->width  = 0.5;
-  sphere2->depth  = 0.5;
+  auto box_light = std::make_unique<sdf_box>();
+  box_light->whd = {0.2, 0.2, 0.00001};
+  scene.implicits.push_back(box_light.get());
+
+  instance_data linst;
+  linst.implicit = scene.implicits.size() - 1;
+  linst.material = 2;
+  linst.frame    = rotation_frame({1, 0, 0}, radians(45.f));
+  linst.frame.o  = vec3f{0, 0.3, 0.5};
+  scene.implicits_instances.push_back(linst);
 
 
-  scene.implicits.push_back(sphere2.get());
+  auto plane    = std::make_unique<sdf_box>();
+  plane->whd = {0.5, 0.001, 0.5};
 
-  instance_data sphere2_inst;
-  sphere2_inst.implicit = scene.implicits.size() - 1;
-  sphere2_inst.frame    = rotation_frame({0, 0, 1}, radians(90.f));
-  sphere2_inst.material = 0;
-  scene.implicits_instances.push_back(sphere2_inst);
+
+  scene.implicits.push_back(plane.get());
+
+  instance_data plane_inst;
+  plane_inst.implicit = scene.implicits.size() - 1;
+  plane_inst.material = 0;
+  scene.implicits_instances.push_back(plane_inst);
   
   print_progress_end();
 

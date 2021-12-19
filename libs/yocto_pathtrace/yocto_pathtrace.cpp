@@ -342,19 +342,32 @@ static float sample_lights_pdf(const scene_data& scene, const bvh_data& bvh,
 
 // --- SDF ---
 
-bool spheretrace(const scene_data& scene, const instance_data& sdf_instance,
-    const ray3f& ray, float& dist) 
+bool spheretrace(const scene_data&    scene,
+    const std::vector<instance_data>& instances,
+    const ray3f& ray, float& dist, int& instance) 
 {
   auto t = ray.tmin;
-  for (int i = 0; i < 150; ++i) {
+  for (int i = 0; i < 380; ++i) {
     if (t >= ray.tmax) return false;
+
     auto  p = ray_point(ray, t);
-    auto& d = eval_sdf(scene, sdf_instance, p).dist;
-    if (d < yocto::flt_eps) {
+    float min_d = eval_sdf(scene, instances[0], p);
+    int   min_inst = 0;
+    for (int i = 1; i < instances.size(); ++i) {
+      const auto&  inst = instances[i];
+      float       d    = eval_sdf(scene, inst, p);
+      if (d < min_d) {
+        min_inst = i;
+        min_d    = d;
+      }
+    }
+    
+    if (min_d < yocto::flt_eps) {
       dist = t;
+      instance = min_inst;
       return true;
     }
-    t += d;
+    t += min_d;
   }
 
   return false;
@@ -375,16 +388,9 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
     float dist         = 0;
-    bool  intersection = false;
     int   instance;
-    for (const auto& [i, inst] : enumerate(scene.implicits_instances)) {
-      if (inst.implicit == invalidid) continue;
-      intersection = spheretrace(scene, inst, ray, dist);
-      if (intersection) {
-        instance = i;
-        break;
-      }
-    }
+    bool  intersection = spheretrace(scene, scene.implicits_instances, ray, dist, instance);
+    
     if (!intersection) {
       radiance += weight * eval_environment(scene, ray.d);
       break;
@@ -411,7 +417,7 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
     // next direction
     auto incoming = vec3f{0, 0, 0};
     if (!is_delta(material)) {
-      if (rand1f(rng) < 0.5f) {
+      if (rand1f(rng) < 1.0f) {
         incoming = sample_bsdfcos(
             material, normal, outgoing, rand1f(rng), rand2f(rng));
       } else {
@@ -421,8 +427,8 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
       if (incoming == vec3f{0, 0, 0}) break;
       weight *=
           eval_bsdfcos(material, normal, outgoing, incoming) /
-          (0.5f * sample_bsdfcos_pdf(material, normal, outgoing, incoming) +
-              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming));
+          (1.f * sample_bsdfcos_pdf(material, normal, outgoing, incoming) +
+              0.0f * sample_lights_pdf(scene, bvh, lights, position, incoming));
     } else {
       incoming = sample_delta(material, normal, outgoing, rand1f(rng));
       weight *= eval_delta(material, normal, outgoing, incoming) /
