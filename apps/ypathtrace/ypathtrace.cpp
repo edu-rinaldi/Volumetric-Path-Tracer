@@ -47,10 +47,6 @@ void run_offline(const string& filename, const string& output,
   auto error = string{};
   auto scene = scene_data{};
   if (!load_scene(filename, scene, error)) print_fatal(error);
-  
-  sdf_sphere* sphere1 = new sdf_sphere{};
-  sphere1->radius = 0.04f;
-  scene.implicits.push_back(sphere1);
 
   print_progress_end();
 
@@ -100,47 +96,36 @@ void run_interactive(const string& filename, const string& output,
   auto error = string{};
   auto scene = scene_data{};
   if (!load_scene(filename, scene, error)) print_fatal(error);
-  auto sphere1 = std::make_shared<sdf_sphere>();
-  sphere1->radius = 0.052f;
 
-  auto box = std::make_unique<sdf_box>();
-  box->whd = vec3f{0.05, 0.05, 0.05};
+  auto plane = std::make_shared<sdf_box>();
+  plane->whd = {1, yocto::flt_eps, 1};
+  scene.implicits.push_back(plane);
 
-  auto prova = std::make_unique<sdf_union<2>>();
-  prova->functions[0] = sphere1.get();
-  prova->functions[1] = box.get();
+  auto& plane_instance = scene.implicits_instances.emplace_back();
+  plane_instance.frames.emplace_back();
+  plane_instance.implicits.push_back(scene.implicits.size() - 1);
+  plane_instance.materials.emplace_back(0);
+  plane_instance.type = sdf_instance_type::primitive;
 
-  scene.implicits.push_back(prova.get());
+  auto box = std::make_shared<sdf_box>();
+  box->whd = {0.05, 0.05, 0.05};
+  auto sphere = std::make_shared<sdf_sphere>();
+  sphere->radius = 0.05;
+
+  auto& spherebox = scene.implicits_instances.emplace_back();
+  spherebox.frames.push_back(translation_frame({0.01, 0.05, 0}));
+  spherebox.frames.push_back(translation_frame({-0.01, 0.05, 0}));
   
-  instance_data tinst;
-  tinst.implicit        = scene.implicits.size() - 1;
-  tinst.material        = 3;
-  tinst.frame           = translation_frame(vec3f{0, 0.05, 0});
+  scene.implicits.push_back(sphere);
+  spherebox.implicits.emplace_back(scene.implicits.size() - 1);
+
+  scene.implicits.push_back(box);
+  spherebox.implicits.emplace_back(scene.implicits.size() - 1);
+
+  spherebox.materials.emplace_back(3);
+  spherebox.materials.emplace_back(4);
+  spherebox.type = sdf_instance_type::subtraction_op;
   
-  scene.implicits_instances.push_back(tinst);
-
-  auto box_light = std::make_unique<sdf_box>();
-  box_light->whd = {0.2, 0.2, 0.00001};
-  scene.implicits.push_back(box_light.get());
-
-  instance_data linst;
-  linst.implicit = scene.implicits.size() - 1;
-  linst.material = 2;
-  linst.frame    = rotation_frame({1, 0, 0}, radians(45.f));
-  linst.frame.o  = vec3f{0, 0.3, 0.5};
-  scene.implicits_instances.push_back(linst);
-
-
-  auto plane    = std::make_unique<sdf_box>();
-  plane->whd = {0.5, 0.001, 0.5};
-
-
-  scene.implicits.push_back(plane.get());
-
-  instance_data plane_inst;
-  plane_inst.implicit = scene.implicits.size() - 1;
-  plane_inst.material = 0;
-  scene.implicits_instances.push_back(plane_inst);
   
   print_progress_end();
 

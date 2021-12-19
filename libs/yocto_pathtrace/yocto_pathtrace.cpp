@@ -342,35 +342,34 @@ static float sample_lights_pdf(const scene_data& scene, const bvh_data& bvh,
 
 // --- SDF ---
 
-bool spheretrace(const scene_data&    scene,
-    const std::vector<instance_data>& instances,
-    const ray3f& ray, float& dist, int& instance) 
+struct spheretrace_result 
+{
+  bool hit = false;
+  float dist;
+  sdf_result sdf_res;
+};
+
+spheretrace_result spheretrace(const scene_data& scene,
+    const std::vector<sdf_instance>& instances,
+    const ray3f& ray) 
 {
   auto t = ray.tmin;
   for (int i = 0; i < 380; ++i) {
-    if (t >= ray.tmax) return false;
+    if (instances.size() == 0) break;
+    if (t >= ray.tmax) return {};
 
     auto  p = ray_point(ray, t);
-    float min_d = eval_sdf(scene, instances[0], p);
-    int   min_inst = 0;
+    auto& min_d = eval_sdf(scene, 0, p);
     for (int i = 1; i < instances.size(); ++i) {
-      const auto&  inst = instances[i];
-      float       d    = eval_sdf(scene, inst, p);
-      if (d < min_d) {
-        min_inst = i;
-        min_d    = d;
-      }
+      auto& d = eval_sdf(scene, i, p);
+      if (d < min_d) min_d = d;
     }
     
-    if (min_d < yocto::flt_eps) {
-      dist = t;
-      instance = min_inst;
-      return true;
-    }
+    if (min_d < yocto::flt_eps) return {true, t, min_d};
     t += min_d;
   }
 
-  return false;
+  return {};
 }
 
 // --- END SDF ---
@@ -387,20 +386,18 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    float dist         = 0;
-    int   instance;
-    bool  intersection = spheretrace(scene, scene.implicits_instances, ray, dist, instance);
+    const auto&  intersection = spheretrace(scene, scene.implicits_instances, ray);
     
-    if (!intersection) {
+    if (!intersection.hit) {
       radiance += weight * eval_environment(scene, ray.d);
       break;
     }
 
     // prepare shading point
     auto outgoing = -ray.d;
-    auto position = ray_point(ray, dist);
-    auto normal   = eval_sdf_normal(scene, scene.implicits_instances[instance], position);
-    auto& material = eval_material(scene, scene.implicits_instances[instance]);
+    auto position = ray_point(ray, intersection.dist);
+    auto  normal   = eval_sdf_normal(scene, intersection.sdf_res.instance, position);
+    auto& material = eval_material(scene, intersection.sdf_res.instance, intersection.sdf_res.subinstance);
     // handle opacity
     if (material.opacity < 1 && rand1f(rng) >= material.opacity) {
       ray = {position + ray.d * 1e-2f, ray.d};
