@@ -41,6 +41,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <functional>
 
 #include "yocto_geometry.h"
 #include "yocto_image.h"
@@ -188,34 +189,18 @@ struct subdiv_data {
 // environment. In that case, the element transforms are computed from
 // the hierarchy. Animation is also optional, with keyframe data that
 // updates node transformations only if defined.
-struct sdf_data;
-
-
-enum struct sdf_instance_type {
-  primitive,
-  union_op,
-  subtraction_op,
-  intersection_op
-};
-
-struct sdf_instance {
-  std::vector<frame3f> frames    = {};
-  std::vector<int>     implicits = {};
-  std::vector<int>     materials = {};
-  sdf_instance_type    type      = {};
-};
+struct op_res;
 
 struct scene_data {
   // scene elements
-  vector<camera_data>               cameras             = {};
-  vector<instance_data>             instances           = {};
-  vector<environment_data>          environments        = {};
-  vector<shape_data>                shapes              = {};
-  vector<texture_data>              textures            = {};
-  vector<material_data>             materials           = {};
-  vector<subdiv_data>               subdivs             = {};
-  vector<std::shared_ptr<sdf_data>> implicits           = {};
-  vector<sdf_instance>              implicits_instances = {};
+  vector<camera_data>                        cameras      = {};
+  vector<instance_data>                      instances    = {};
+  vector<environment_data>                   environments = {};
+  vector<shape_data>                         shapes       = {};
+  vector<texture_data>                       textures     = {};
+  vector<material_data>                      materials    = {};
+  vector<subdiv_data>                        subdivs      = {};
+  vector<std::function<op_res(const vec3f&)>> implicits    = {};
   // names (this will be cleanup significantly later)
   vector<string> camera_names      = {};
   vector<string> texture_names     = {};
@@ -331,7 +316,7 @@ vec4f eval_color(const scene_data& scene, const instance_data& instance,
 // Eval material to obtain emission, brdf and opacity.
 material_point eval_material(const scene_data& scene,
     const instance_data& instance, int element, const vec2f& uv);
-material_point eval_material(const scene_data& scene, int instance, int subinstance);
+material_point eval_material(const scene_data& scene, int material);
 // check if a material has a volume
 bool is_volumetric(const scene_data& scene, const instance_data& instance);
 
@@ -374,7 +359,6 @@ vector<string> scene_stats(const scene_data& scene, bool verbose = false);
 vector<string> scene_validation(
     const scene_data& scene, bool notextures = false);
 
-void make_sdf_from_type(sdf_data& sdf);
 
 }  // namespace yocto
 

@@ -30,8 +30,8 @@
 #include <yocto/yocto_math.h>
 #include <yocto/yocto_parallel.h>
 #include <yocto/yocto_scene.h>
-#include <yocto/yocto_sdfs.h>
 #include <yocto/yocto_sceneio.h>
+#include <yocto/yocto_sdfs.h>
 #include <yocto/yocto_shape.h>
 #include <yocto_gui/yocto_glview.h>
 #include <yocto_pathtrace/yocto_pathtrace.h>
@@ -97,36 +97,31 @@ void run_interactive(const string& filename, const string& output,
   auto scene = scene_data{};
   if (!load_scene(filename, scene, error)) print_fatal(error);
 
-  auto plane = std::make_shared<sdf_box>();
-  plane->whd = {1, yocto::flt_eps, 1};
-  scene.implicits.push_back(plane);
+  auto fscene = [](const vec3f& p) {
+    op_res res = {1e10, -1};
 
-  auto& plane_instance = scene.implicits_instances.emplace_back();
-  plane_instance.frames.emplace_back();
-  plane_instance.implicits.push_back(scene.implicits.size() - 1);
-  plane_instance.materials.emplace_back(0);
-  plane_instance.type = sdf_instance_type::primitive;
+    /*res = op_union(res, {sd_sphere(p - vec3f{-2.0, 0.25, 0.0}, 0.25), 3});*/
 
-  auto box = std::make_shared<sdf_box>();
-  box->whd = {0.05, 0.05, 0.05};
-  auto sphere = std::make_shared<sdf_sphere>();
-  sphere->radius = 0.05;
+    // bounding box
+    if (sd_box(p - vec3f{0.0, 0.3, -1.0}, vec3f{0.35, 0.3, 2.5}) < res) 
+    {
+      // more primitives
+      res          = op_union(res, {sd_box(p - vec3f{0.0, 0.25, 0.0}, vec3f{0.3, 0.25, 0.2}), 3});
+      vec3f ptorus = (p - vec3f{0.0, 0.30, 1.0});
+      res          = op_union(res, {sd_torus({ptorus.x, ptorus.z, ptorus.y}, vec2f{0.25, 0.05}), 4});
+      res          = op_union(res, {sd_cone(p - vec3f{0.0, 0.45, -1.0}, vec2f{0.6, 0.8}, 0.45), 4});
+      res = op_union(res, {sd_capped_cone(p - vec3f{0.0, 0.25, -2.0}, 0.25f, 0.25f, 0.1f), 3});
+      res = op_union(res, {sd_solid_angle(p - vec3f{0.0, 0.00, -3.0}, vec2f{3, 4} / 5.0f, 0.4), 4});
+      res = op_union(res,
+          {sd_box(p - vec3f{0, 0.5, -1.0}, vec3f{0.2, 0.15, yocto::flt_eps}),
+              2});
+    }
+    
+    return res;
+  };
 
-  auto& spherebox = scene.implicits_instances.emplace_back();
-  spherebox.frames.push_back(translation_frame({0.01, 0.05, 0}));
-  spherebox.frames.push_back(translation_frame({-0.01, 0.05, 0}));
-  
-  scene.implicits.push_back(sphere);
-  spherebox.implicits.emplace_back(scene.implicits.size() - 1);
+  scene.implicits.push_back(fscene);
 
-  scene.implicits.push_back(box);
-  spherebox.implicits.emplace_back(scene.implicits.size() - 1);
-
-  spherebox.materials.emplace_back(3);
-  spherebox.materials.emplace_back(4);
-  spherebox.type = sdf_instance_type::subtraction_op;
-  
-  
   print_progress_end();
 
   // camera

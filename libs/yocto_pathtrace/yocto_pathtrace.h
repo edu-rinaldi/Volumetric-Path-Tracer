@@ -80,6 +80,7 @@ enum struct pathtrace_shader_type {
   texcoord,      // texcoords
   color,         // colors
   implicit,     // implicit
+  implicit_normal,
 };
 
 // Options for trace functions
@@ -96,7 +97,7 @@ struct pathtrace_params {
 };
 
 const auto pathtrace_shader_names = vector<string>{"volpathtrace", "pathtrace",
-    "naive", "eyelight", "normal", "texcoord", "color", "implicit"};
+    "naive", "eyelight", "normal", "texcoord", "color", "implicit", "implicit_normal"};
 
 // Scene lights used during rendering. These are created automatically.
 struct pathtrace_light {

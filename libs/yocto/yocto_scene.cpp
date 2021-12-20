@@ -578,11 +578,9 @@ material_point eval_material(const scene_data& scene,
   return point;
 }
 
-material_point eval_material(
-    const scene_data& scene, int instance, int subinstance) {
+material_point eval_material(const scene_data& scene, int mat) {
   ;
-  auto& material = scene.materials[scene.implicits_instances[instance]
-                                       .materials[subinstance]];
+  auto& material = scene.materials[mat];
 
   // material point
   auto point         = material_point{};

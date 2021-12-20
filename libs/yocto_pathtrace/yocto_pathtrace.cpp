@@ -346,30 +346,22 @@ struct spheretrace_result
 {
   bool hit = false;
   float dist;
-  sdf_result sdf_res;
+  int   material;
 };
 
-spheretrace_result spheretrace(const scene_data& scene,
-    const std::vector<sdf_instance>& instances,
-    const ray3f& ray) 
+spheretrace_result spheretrace(const sdf& sdf_scene, const ray3f& ray) 
 {
   auto t = ray.tmin;
-  for (int i = 0; i < 380; ++i) {
-    if (instances.size() == 0) break;
-    if (t >= ray.tmax) return {};
+  for (int i = 0; i < 170 && t < ray.tmax; ++i) {
 
-    auto  p = ray_point(ray, t);
-    auto& min_d = eval_sdf(scene, 0, p);
-    for (int i = 1; i < instances.size(); ++i) {
-      auto& d = eval_sdf(scene, i, p);
-      if (d < min_d) min_d = d;
-    }
+    const auto&  p = ray_point(ray, t);
+    auto min_d = sdf_scene(p);
     
-    if (min_d < yocto::flt_eps) return {true, t, min_d};
+    if (abs(min_d) < (yocto::flt_eps*t)) return {true, t, min_d.material};
     t += min_d;
   }
 
-  return {};
+  return {false, t};
 }
 
 // --- END SDF ---
@@ -386,7 +378,7 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    const auto&  intersection = spheretrace(scene, scene.implicits_instances, ray);
+    const auto&  intersection = spheretrace(scene.implicits[0], ray);
     
     if (!intersection.hit) {
       radiance += weight * eval_environment(scene, ray.d);
@@ -396,8 +388,8 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
     // prepare shading point
     auto outgoing = -ray.d;
     auto position = ray_point(ray, intersection.dist);
-    auto  normal   = eval_sdf_normal(scene, intersection.sdf_res.instance, position);
-    auto& material = eval_material(scene, intersection.sdf_res.instance, intersection.sdf_res.subinstance);
+    auto  normal   = eval_sdf_normal(scene.implicits[0], position);
+    auto& material = eval_material(scene, intersection.material);
     // handle opacity
     if (material.opacity < 1 && rand1f(rng) >= material.opacity) {
       ray = {position + ray.d * 1e-2f, ray.d};
@@ -785,6 +777,23 @@ static vec4f shade_eyelight(const scene_data& scene, const bvh_data& bvh,
 }
 
 // Normal for debugging.
+static vec4f shade_implicit_normal(const scene_data& scene, const bvh_data& bvh,
+    const pathtrace_lights& lights, const ray3f& ray, rng_state& rng,
+    const pathtrace_params& params) {
+  const auto& intersection = spheretrace(scene.implicits[0], ray);
+
+  if (!intersection.hit) {
+    return zero4f;
+  }
+
+  // prepare shading point
+  auto  outgoing = -ray.d;
+  auto  position = ray_point(ray, intersection.dist);
+  auto  normal   = eval_sdf_normal(scene.implicits[0], position);
+  return {normal.x, normal.y, normal.z, 1};
+}
+
+// Normal for debugging.
 static vec4f shade_normal(const scene_data& scene, const bvh_data& bvh,
     const pathtrace_lights& lights, const ray3f& ray, rng_state& rng,
     const pathtrace_params& params) {
@@ -838,6 +847,7 @@ static pathtrace_shader_func get_shader(const pathtrace_params& params) {
     case pathtrace_shader_type::texcoord: return shade_texcoord;
     case pathtrace_shader_type::color: return shade_color;
     case pathtrace_shader_type::implicit: return shade_implicit;
+    case pathtrace_shader_type::implicit_normal: return shade_implicit_normal;
     default: {
       throw std::runtime_error("sampler unknown");
       return nullptr;
