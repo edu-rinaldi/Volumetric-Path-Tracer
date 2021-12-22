@@ -103,20 +103,25 @@ void run_interactive(const string& filename, const string& output,
     /*res = op_union(res, {sd_sphere(p - vec3f{-2.0, 0.25, 0.0}, 0.25), 3});*/
 
     // bounding box
-    if (sd_box(p - vec3f{0.0, 0.3, -1.0}, vec3f{0.35, 0.3, 2.5}) < res) 
-    {
+    if (sd_box(p - vec3f{0.0, 0.3, -1.0}, vec3f{0.35, 0.3, 2.5}) < res) {
       // more primitives
-      res          = op_union(res, {sd_box(p - vec3f{0.0, 0.25, 0.0}, vec3f{0.3, 0.25, 0.2}), 3});
+      res = op_union(
+          res, {sd_box(p - vec3f{0.0, 0.25, 0.0}, vec3f{0.3, 0.25, 0.2}), 3});
       vec3f ptorus = (p - vec3f{0.0, 0.30, 1.0});
-      res          = op_union(res, {sd_torus({ptorus.x, ptorus.z, ptorus.y}, vec2f{0.25, 0.05}), 4});
-      res          = op_union(res, {sd_cone(p - vec3f{0.0, 0.45, -1.0}, vec2f{0.6, 0.8}, 0.45), 4});
-      res = op_union(res, {sd_capped_cone(p - vec3f{0.0, 0.25, -2.0}, 0.25f, 0.25f, 0.1f), 3});
-      res = op_union(res, {sd_solid_angle(p - vec3f{0.0, 0.00, -3.0}, vec2f{3, 4} / 5.0f, 0.4), 4});
+      res          = op_union(res,
+                   {sd_torus({ptorus.x, ptorus.z, ptorus.y}, vec2f{0.25, 0.05}), 4});
+      res          = op_union(
+                   res, {sd_cone(p - vec3f{0.0, 0.45, -1.0}, vec2f{0.6, 0.8}, 0.45), 4});
+      res = op_union(res,
+          {sd_capped_cone(p - vec3f{0.0, 0.25, -2.0}, 0.25f, 0.25f, 0.1f), 3});
+      res = op_union(res,
+          {sd_solid_angle(p - vec3f{0.0, 0.00, -3.0}, vec2f{3, 4} / 5.0f, 0.4),
+              4});
       res = op_union(res,
           {sd_box(p - vec3f{0, 0.5, -1.0}, vec3f{0.2, 0.15, yocto::flt_eps}),
               2});
     }
-    
+
     return res;
   };
 
@@ -216,7 +221,7 @@ void run_interactive(const string& filename, const string& output,
           render_update = true;
         }
       }
-    });
+     });
   };
 
   // stop render

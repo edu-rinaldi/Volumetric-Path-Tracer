@@ -579,7 +579,6 @@ material_point eval_material(const scene_data& scene,
 }
 
 material_point eval_material(const scene_data& scene, int mat) {
-  ;
   auto& material = scene.materials[mat];
 
   // material point
@@ -625,8 +624,6 @@ bool is_volumetric(const scene_data& scene, const instance_data& instance) {
 }
 
 }  // namespace yocto
-
-
 
 // -----------------------------------------------------------------------------
 // ENVIRONMENT PROPERTIES
@@ -810,7 +807,7 @@ void tesselate_subdiv(
       for (auto i = 0; i < 4; i++) {
         auto& displacement_tex = scene.textures[subdiv.displacement_tex];
         auto  disp             = mean(
-            eval_texture(displacement_tex, subdiv.texcoords[qtxt[i]], false));
+                         eval_texture(displacement_tex, subdiv.texcoords[qtxt[i]], false));
         if (!displacement_tex.pixelsb.empty()) disp -= 0.5f;
         offset[qpos[i]] += subdiv.displacement * disp;
         count[qpos[i]] += 1;
@@ -986,7 +983,6 @@ vector<string> scene_validation(const scene_data& scene, bool notextures) {
 
   return errs;
 }
-
 
 }  // namespace yocto
 

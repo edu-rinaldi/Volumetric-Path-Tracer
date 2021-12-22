@@ -32,9 +32,9 @@
 #include <yocto/yocto_geometry.h>
 #include <yocto/yocto_parallel.h>
 #include <yocto/yocto_sampling.h>
+#include <yocto/yocto_sdfs.h>
 #include <yocto/yocto_shading.h>
 #include <yocto/yocto_shape.h>
-#include <yocto/yocto_sdfs.h>
 
 // -----------------------------------------------------------------------------
 // IMPLEMENTATION FOR PATH TRACING
@@ -238,7 +238,8 @@ static float sample_delta_pdf(const material_point& material,
 static vec3f eval_scattering(const material_point& material,
     const vec3f& outgoing, const vec3f& incoming) {
   // YOUR CODE GOES HERE
-  return material.density * material.scattering * eval_phasefunction(material.scanisotropy, incoming, outgoing);
+  return material.density * material.scattering *
+         eval_phasefunction(material.scanisotropy, incoming, outgoing);
 }
 
 static vec3f sample_scattering(const material_point& material,
@@ -323,7 +324,7 @@ static float sample_lights_pdf(const scene_data& scene, const bvh_data& bvh,
         auto i = clamp(
             (int)(texcoord.x * emission_tex.width), 0, emission_tex.width - 1);
         auto j    = clamp((int)(texcoord.y * emission_tex.height), 0,
-            emission_tex.height - 1);
+               emission_tex.height - 1);
         auto prob = sample_discrete_pdf(
                         light.elements_cdf, j * emission_tex.width + i) /
                     light.elements_cdf.back();
@@ -342,22 +343,33 @@ static float sample_lights_pdf(const scene_data& scene, const bvh_data& bvh,
 
 // --- SDF ---
 
-struct spheretrace_result 
-{
-  bool hit = false;
+struct spheretrace_result {
+  bool  hit = false;
   float dist;
   int   material;
 };
 
-spheretrace_result spheretrace(const sdf& sdf_scene, const ray3f& ray) 
-{
-  auto t = ray.tmin;
+spheretrace_result spheretrace(
+    const scene_data& scene, const sdf& sdf_scene, const ray3f& ray) {
+  auto   t = ray.tmin;
+  op_res min_d;
   for (int i = 0; i < 170 && t < ray.tmax; ++i) {
+    const auto& p = ray_point(ray, t);
+    for (const auto& instance : scene.vol_instances) {
+      const auto& volume = scene.volumes[instance.volume];
+      vec3f       whd    = {static_cast<float>(volume.width),
+          static_cast<float>(volume.height), static_cast<float>(volume.depth)};
 
-    const auto&  p = ray_point(ray, t);
+      if (sd_box(p - instance.frame.o, whd) < 1e10) {
+        vec3f uvw = p - instance.frame.o / whd;
+        float sdf = eval_volume(volume, uvw);
+        if (abs(sdf) < (yocto::flt_eps * t))
+          return {true, t, instance.material};
+      }
+    }
     auto min_d = sdf_scene(p);
-    
-    if (abs(min_d) < (yocto::flt_eps*t)) return {true, t, min_d.material};
+
+    if (abs(min_d) < (yocto::flt_eps * t)) return {true, t, min_d.material};
     t += min_d;
   }
 
@@ -374,12 +386,12 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
   auto weight   = vec3f{1, 1, 1};
   auto ray      = ray_;
   auto hit      = false;
-  
+
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    const auto&  intersection = spheretrace(scene.implicits[0], ray);
-    
+    const auto& intersection = spheretrace(scene, scene.implicits[0], ray);
+
     if (!intersection.hit) {
       radiance += weight * eval_environment(scene, ray.d);
       break;
@@ -388,8 +400,8 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
     // prepare shading point
     auto outgoing = -ray.d;
     auto position = ray_point(ray, intersection.dist);
-    auto  normal   = eval_sdf_normal(scene.implicits[0], position);
-    auto& material = eval_material(scene, intersection.material);
+    auto normal   = eval_sdf_normal(scene.implicits[0], position);
+    auto material = eval_material(scene, intersection.material);
     // handle opacity
     if (material.opacity < 1 && rand1f(rng) >= material.opacity) {
       ray = {position + ray.d * 1e-2f, ray.d};
@@ -461,30 +473,26 @@ static vec4f shade_volpathtrace(const scene_data& scene, const bvh_data& bvh,
       break;
     }
 
-
     // Sample transmittance
     bool inVolume = false;
-    if (!vstack.empty()) 
-    {
-      const vec3f& density = vstack.back().density;
-      float  distance = sample_transmittance(
-          density, intersection.distance, rand1f(rng), rand1f(rng));
+    if (!vstack.empty()) {
+      const vec3f& density  = vstack.back().density;
+      float        distance = sample_transmittance(
+                 density, intersection.distance, rand1f(rng), rand1f(rng));
       weight *= eval_transmittance(density, distance) /
                 sample_transmittance_pdf(
                     density, distance, intersection.distance);
-      inVolume = distance < intersection.distance;
+      inVolume              = distance < intersection.distance;
       intersection.distance = distance;
     }
 
     // Handle surface
-    if (!inVolume) 
-    {
+    if (!inVolume) {
       // prepare shading point
       auto outgoing = -ray.d;
       auto position = eval_shading_position(scene, intersection, outgoing);
       auto normal   = eval_shading_normal(scene, intersection, outgoing);
       auto material = eval_material(scene, intersection);
-
 
       // handle opacity
       if (material.opacity < 1 && rand1f(rng) >= material.opacity) {
@@ -492,7 +500,6 @@ static vec4f shade_volpathtrace(const scene_data& scene, const bvh_data& bvh,
         bounce -= 1;
         continue;
       }
-
 
       // set hit variables
       if (bounce == 0) hit = true;
@@ -523,21 +530,19 @@ static vec4f shade_volpathtrace(const scene_data& scene, const bvh_data& bvh,
       }
 
       // Update vstack
-      if (is_volumetric(scene, intersection) && dot(normal, outgoing) * dot(normal, incoming) < 0) 
-      {
+      if (is_volumetric(scene, intersection) &&
+          dot(normal, outgoing) * dot(normal, incoming) < 0) {
         if (vstack.empty())
           vstack.push_back(eval_material(scene, intersection));
         else
           vstack.pop_back();
       }
 
-
       // setup next iteration
       ray = {position, incoming};
     }
     // Handle volume
-    else 
-    {
+    else {
       // prepare shading point
       const vec3f& outgoing = -ray.d;
       const vec3f& position = ray_point(ray, intersection.distance);
@@ -546,8 +551,9 @@ static vec4f shade_volpathtrace(const scene_data& scene, const bvh_data& bvh,
       radiance += weight * eval_emission(vol, position, outgoing);  // emission
 
       // incoming
-      vec3f incoming = rand1f(rng) < 0.5 ? 
-          sample_scattering(vol, outgoing, rand1f(rng), rand2f(rng))
+      vec3f incoming =
+          rand1f(rng) < 0.5
+              ? sample_scattering(vol, outgoing, rand1f(rng), rand2f(rng))
               : sample_lights(scene, lights, position, rand1f(rng), rand1f(rng),
                     rand2f(rng));
       weight *=
@@ -555,9 +561,8 @@ static vec4f shade_volpathtrace(const scene_data& scene, const bvh_data& bvh,
           (0.5f * sample_scattering_pdf(vol, outgoing, incoming) +
               0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming));
       ray = {position, incoming};  // setup recurse
-
     }
-    
+
     // check weight
     if (weight == vec3f{0, 0, 0} || !isfinite(weight)) break;
 
@@ -571,8 +576,6 @@ static vec4f shade_volpathtrace(const scene_data& scene, const bvh_data& bvh,
 
   return {radiance.x, radiance.y, radiance.z, hit ? 1.0f : 0.0f};
 }
-
-
 
 // Recursive path tracing.
 static vec4f shade_pathtrace(const scene_data& scene, const bvh_data& bvh,
@@ -780,16 +783,16 @@ static vec4f shade_eyelight(const scene_data& scene, const bvh_data& bvh,
 static vec4f shade_implicit_normal(const scene_data& scene, const bvh_data& bvh,
     const pathtrace_lights& lights, const ray3f& ray, rng_state& rng,
     const pathtrace_params& params) {
-  const auto& intersection = spheretrace(scene.implicits[0], ray);
+  const auto& intersection = spheretrace(scene, scene.implicits[0], ray);
 
   if (!intersection.hit) {
     return zero4f;
   }
 
   // prepare shading point
-  auto  outgoing = -ray.d;
-  auto  position = ray_point(ray, intersection.dist);
-  auto  normal   = eval_sdf_normal(scene.implicits[0], position);
+  auto outgoing = -ray.d;
+  auto position = ray_point(ray, intersection.dist);
+  auto normal   = eval_sdf_normal(scene.implicits[0], position) * 0.5 + 0.5;
   return {normal.x, normal.y, normal.z, 1};
 }
 
@@ -1011,12 +1014,12 @@ template <typename T>
 static void tesselate_catmullclark(
     std::vector<vec4i>& quads, std::vector<T>& vert, bool lock_boundary) {
   // YOUR CODE GOES HERE --------------
-  
+
   // construct edge map and get edges and boundary
-  edge_map emap     = make_edge_map(quads);
+  edge_map           emap     = make_edge_map(quads);
   std::vector<vec2i> edges    = get_edges(emap);
   std::vector<vec2i> boundary = get_boundary(emap);
-  
+
   // initialize number of elements
   auto nv = (int)vert.size();
   auto ne = (int)edges.size();
@@ -1040,36 +1043,28 @@ static void tesselate_catmullclark(
   for (int i = 0; i < quads.size(); ++i) {
     auto& q = quads[i];
     if (q.z != q.w) {
-      tquads.push_back({q.x, 
-          nv + edge_index(emap, {q.x, q.y}), 
-          nv + ne + (int)i,
-          nv + edge_index(emap, {q.w, q.x})});
+      tquads.push_back({q.x, nv + edge_index(emap, {q.x, q.y}),
+          nv + ne + (int)i, nv + edge_index(emap, {q.w, q.x})});
       tquads.push_back({q.y, nv + edge_index(emap, {q.y, q.z}),
-          nv + ne + (int)i,
-          nv + edge_index(emap, {q.x, q.y})});
+          nv + ne + (int)i, nv + edge_index(emap, {q.x, q.y})});
       tquads.push_back({q.z, nv + edge_index(emap, {q.z, q.w}),
-          nv + ne + (int)i,
-          nv + edge_index(emap, {q.y, q.z})});
+          nv + ne + (int)i, nv + edge_index(emap, {q.y, q.z})});
       tquads.push_back({q.w, nv + edge_index(emap, {q.w, q.x}),
-          nv + ne + (int)i,
-          nv + edge_index(emap, {q.z, q.w})});
+          nv + ne + (int)i, nv + edge_index(emap, {q.z, q.w})});
     } else {
       tquads.push_back({q.x, nv + edge_index(emap, {q.x, q.y}),
-          nv + ne + (int)i,
-          nv + edge_index(emap, {q.z, q.x})});
+          nv + ne + (int)i, nv + edge_index(emap, {q.z, q.x})});
       tquads.push_back({q.y, nv + edge_index(emap, {q.y, q.z}),
-          nv + ne + (int)i,
-          nv + edge_index(emap, {q.x, q.y})});
+          nv + ne + (int)i, nv + edge_index(emap, {q.x, q.y})});
       tquads.push_back({q.z, nv + edge_index(emap, {q.z, q.x}),
-          nv + ne + (int)i,
-          nv + edge_index(emap, {q.y, q.z})});
+          nv + ne + (int)i, nv + edge_index(emap, {q.y, q.z})});
     }
   }
-  
+
   // Setup boundary
   auto tboundary = vector<vec2i>();
   for (auto e : boundary) {
-    tboundary.push_back({e.x, nv + edge_index(emap,e)});
+    tboundary.push_back({e.x, nv + edge_index(emap, e)});
     tboundary.push_back({nv + edge_index(emap, e), e.y});
   }
   auto tcrease_edges = vector<vec2i>();
@@ -1123,7 +1118,7 @@ static void tesselate_catmullclark(
   }
   tverts = avert;
   vert   = tverts;
-  quads = tquads;
+  quads  = tquads;
 }
 
 void tesselate_surface(

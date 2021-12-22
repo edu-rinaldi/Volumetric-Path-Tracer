@@ -37,11 +37,11 @@
 // INCLUDES
 // -----------------------------------------------------------------------------
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-#include <functional>
 
 #include "yocto_geometry.h"
 #include "yocto_image.h"
@@ -191,16 +191,39 @@ struct subdiv_data {
 // updates node transformations only if defined.
 struct op_res;
 
+template <typename T>
+struct volume {
+  int            height;
+  int            width;
+  int            depth;
+  std::vector<T> vol;
+
+  inline vec3i size() const { return {width, height, depth}; }
+  inline bool  empty() const { return vol.empty(); }
+  // x + WIDTH * (y + DEPTH * z)
+  inline T operator[](const vec3i& uvw) const {
+    return vol[uvw.x + width * (uvw.y + depth * uvw.z)];
+  }
+};
+
+struct volume_instance {
+  int     volume   = invalidid;
+  int     material = invalidid;
+  frame3f frame;
+};
+
 struct scene_data {
   // scene elements
-  vector<camera_data>                        cameras      = {};
-  vector<instance_data>                      instances    = {};
-  vector<environment_data>                   environments = {};
-  vector<shape_data>                         shapes       = {};
-  vector<texture_data>                       textures     = {};
-  vector<material_data>                      materials    = {};
-  vector<subdiv_data>                        subdivs      = {};
-  vector<std::function<op_res(const vec3f&)>> implicits    = {};
+  vector<camera_data>                         cameras       = {};
+  vector<instance_data>                       instances     = {};
+  vector<environment_data>                    environments  = {};
+  vector<shape_data>                          shapes        = {};
+  vector<texture_data>                        textures      = {};
+  vector<material_data>                       materials     = {};
+  vector<subdiv_data>                         subdivs       = {};
+  vector<volume<float>>                       volumes       = {};
+  vector<volume_instance>                     vol_instances = {};
+  vector<std::function<op_res(const vec3f&)>> implicits     = {};
   // names (this will be cleanup significantly later)
   vector<string> camera_names      = {};
   vector<string> texture_names     = {};
@@ -322,7 +345,6 @@ bool is_volumetric(const scene_data& scene, const instance_data& instance);
 
 }  // namespace yocto
 
-
 // -----------------------------------------------------------------------------
 // ENVIRONMENT PROPERTIES
 // -----------------------------------------------------------------------------
@@ -358,7 +380,6 @@ vector<string> scene_stats(const scene_data& scene, bool verbose = false);
 // Return validation errors as list of strings.
 vector<string> scene_validation(
     const scene_data& scene, bool notextures = false);
-
 
 }  // namespace yocto
 

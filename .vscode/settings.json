@@ -23,6 +23,9 @@
     "utility": "cpp",
     "valarray": "cpp",
     "ranges": "cpp",
-    "memory": "cpp"
+    "memory": "cpp",
+    "ios": "cpp",
+    "__locale": "cpp",
+    "functional": "cpp"
   }
 }
