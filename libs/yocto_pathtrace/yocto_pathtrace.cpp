@@ -347,6 +347,7 @@ struct spheretrace_result {
   bool  hit = false;
   float dist;
   int   material;
+  int   instance;
 };
 
 
@@ -361,7 +362,7 @@ spheretrace_result spheretrace(
     const auto& volume = scene.volumes[instance.volume];
     min_d.material            = instance.material;
     vec3f       whd           = {volume.whd.x, volume.whd.y, volume.whd.z};
-    min_d.d                = eval_sdf(volume, instance, p, t);
+    min_d.d                = eval_sdf(volume, instance, transform_point(instance.frame, p), t);
     
     if (abs(min_d) < (flt_eps * t)) return {true, t, min_d.material};
     t += min_d;
@@ -385,7 +386,6 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
     const auto& intersection = spheretrace(scene, scene.implicits[0], ray);
-
     if (!intersection.hit) {
       radiance += weight * eval_environment(scene, ray.d);
       break;

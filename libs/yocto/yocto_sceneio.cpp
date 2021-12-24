@@ -881,7 +881,7 @@ bool save_volume(
 // -----------------------------------------------------------------------------
 namespace yocto {
 
-bool load_volume(const string& filename, volume<float>& vol, string& error) {
+bool load_volume(const string& filename, volume<float>& vol, bool binary, string& error) {
   auto read_error = [filename, &error]() {
     error = filename + ": read error";
     return false;
@@ -908,36 +908,40 @@ bool load_volume(const string& filename, volume<float>& vol, string& error) {
   };
 
   
-  #if 0
-  std::string   line;
-  std::ifstream vol_file(filename);
-  if (vol_file.fail()) return read_error();
-  bool          first = true;
-  int  count_line = 0;
-  while (getline(vol_file, line)) {
-    if (count_line == 0) {
-      auto whd = split_string(line);
-      width    = atoi(whd[0].c_str());
-      height   = atoi(whd[1].c_str());
-      depth    = atoi(whd[2].c_str());
-      first    = false;
-      count_line++;
-    } 
-    else if (count_line == 1) {
-      count_line++;
+  if (!binary) {
+    std::string   line;
+    std::ifstream vol_file(filename);
+    if (vol_file.fail()) return read_error();
+    bool first      = true;
+    int  count_line = 0;
+    while (getline(vol_file, line)) {
+      if (count_line == 0) {
+        auto whd = split_string(line);
+        width    = atoi(whd[0].c_str());
+        height   = atoi(whd[1].c_str());
+        depth    = atoi(whd[2].c_str());
+        first    = false;
+        count_line++;
+      } else if (count_line == 1) {
+        count_line++;
+      }
+      else if (count_line == 2) {
+        vol.res = atof(line.c_str());
+        printf("%g\n", vol.res);
+        count_line++;
+      } else {
+        auto distances = split_string(line);
+
+        std::transform(distances.begin(), distances.end(),
+            std::back_inserter(vol.vol),
+            [](const string& s) { return atof(s.c_str()); });
+      }
     }
-    else {
-      auto distances = split_string(line);
-      
-      std::transform(distances.begin(), distances.end(),
-          std::back_inserter(vol.vol),
-          [](const string& s) { return atof(s.c_str()); });
-    }
+    vol_file.close();
+    vol.whd = {width, height, depth};
+    return true;
   }
-  vol_file.close();
-  vol.whd = {width, height, depth};
-  return true;
-#else
+
   std::ifstream f(filename, std::ios::binary);
   assert(f.is_open());
   f.read((char*)&width, sizeof(int32_t));
@@ -961,10 +965,6 @@ bool load_volume(const string& filename, volume<float>& vol, string& error) {
   f.close();
   vol.whd = {width, height, depth};
   return true;
-#endif
-
-  
-  
 }
 
 
@@ -3556,6 +3556,9 @@ static bool load_json_scene(
   auto texture_filenames = vector<string>{};
   auto subdiv_filenames  = vector<string>{};
 
+  // bool binary volume file
+  bool binary_vol = false;
+
   // errors
   auto parse_error = [&filename, &error]() {
     error = filename + ": parse error";
@@ -3649,6 +3652,7 @@ static bool load_json_scene(
         auto&                  name  = scene.volume_names.emplace_back();
         auto&                  uri   = volume_filenames.emplace_back();
         get_opt(element, "name", name);
+        get_opt(element, "binary", binary_vol);
         get_opt(element, "uri", uri);
       }
     }
@@ -3693,8 +3697,8 @@ static bool load_json_scene(
         auto& name     = scene.vol_instances_names.emplace_back();
         get_opt(element, "name", name);
         get_opt(element, "frame", instance.frame);
-        get_opt(element, "size", instance.size);
         get_opt(element, "volume", instance.volume);
+        get_opt(element, "scale", instance.scalef);
         get_opt(element, "material", instance.material);
       }
     }
@@ -3732,7 +3736,7 @@ static bool load_json_scene(
     }
     for(auto idx : range(scene.volumes.size())) {
       if (!load_volume(path_join(dirname, volume_filenames[idx]),
-              scene.volumes[idx], error))
+              scene.volumes[idx], binary_vol, error))
         return dependent_error();
     }
 
@@ -3759,7 +3763,7 @@ static bool load_json_scene(
     if (!parallel_for(
             scene.volumes.size(), error, [&](size_t idx, string& error) {
               return load_volume(path_join(dirname, volume_filenames[idx]),
-                  scene.volumes[idx], error);
+                  scene.volumes[idx], binary_vol, error);
             }))
         return dependent_error();
     // load subdivs

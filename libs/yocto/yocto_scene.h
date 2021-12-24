@@ -211,8 +211,8 @@ struct volume {
 struct volume_instance {
   int     volume   = invalidid;
   int     material = invalidid;
+  float   scalef   = 1;
   frame3f frame;
-  vec3f   size;
 };
 
 struct scene_data {

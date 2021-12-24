@@ -198,7 +198,8 @@
   "volumes": [
     {
       "name": "test",
-      "uri": "sackboy.sdf"
+      "uri": "bunny3.sdf",
+      "binary": false
     }
   ],
   "vol_instances": [

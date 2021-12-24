@@ -5,17 +5,17 @@ namespace yocto {
 
 float eval_sdf(const volume<float>& volume, const volume_instance& instance,
     const vec3f& p, float t) {
-  auto grid_res      = vec3f{1, 1.5, 1};
-  auto  origin        = instance.frame.o;
-  // auto bbox_max = vec3f{0.0627788, 0.188996, 0.0607146};
-  // auto bbox_max            = origin + 0.2f * grid_res;
-  auto  bbox_max      = origin + grid_res;
+  
+  vec3f grid_res = {volume.whd.x, volume.whd.y, volume.whd.z};
+  const auto& origin   = instance.frame.o;
+ 
+  auto  bbox_max      = origin + (volume.res * grid_res) * instance.scalef;
   auto  bbox_size     = (bbox_max - origin);
   float bbox_dist     = sd_box(p - (origin + (bbox_size/2.f)), (bbox_size/2.f));
   if (bbox_dist < flt_eps * t ) {
     vec3f uvw = (p - origin);
     uvw       = uvw * 2.f / (bbox_size) - 1;
-    float sdf = eval_volume(volume, uvw);
+    float sdf = eval_volume(volume, uvw) * instance.scalef;
     
     return sdf;
   }
@@ -56,10 +56,14 @@ vec3f eval_sdf_normal(const sdf& sdf, const vec3f& p) {
 vec3f eval_sdf_normal(const volume<float>& volume,
     const volume_instance& instance, const vec3f& p, float t) {
   const float h = yocto::flt_eps * t;  // replace by an appropriate value
-  return normalize(vec3f{1, -1, -1} * eval_sdf(volume, instance, p + vec3f{1, -1, -1} * h, t) +
-      vec3f{-1, -1, 1} * eval_sdf(volume, instance, p + vec3f{-1, -1, 1} * h, t) +
-      vec3f{-1, 1, -1} * eval_sdf(volume, instance, p + vec3f{-1, 1, -1} * h, t) +
-      vec3f{1, 1, 1} * eval_sdf(volume, instance, p + vec3f{1, 1, 1} * h, t));
+  auto        p1 = transform_point(instance.frame, p + vec3f{1, -1, -1} * h);
+  auto        p2 = transform_point(instance.frame, p + vec3f{-1, -1, 1} * h);
+  auto        p3 = transform_point(instance.frame, p + vec3f{-1, 1, -1} * h);
+  auto        p4 = transform_point(instance.frame, p + vec3f{1, 1, 1} * h);
+  return normalize(vec3f{1, -1, -1} * eval_sdf(volume, instance, p1, t) +
+      vec3f{-1, -1, 1} * eval_sdf(volume, instance, p2, t) +
+      vec3f{-1, 1, -1} * eval_sdf(volume, instance, p3, t) +
+      vec3f{1, 1, 1} * eval_sdf(volume, instance, p4, t));
 }
 
 // Evaluates a color image at a point `uv`.
