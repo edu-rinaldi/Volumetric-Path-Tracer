@@ -349,27 +349,21 @@ struct spheretrace_result {
   int   material;
 };
 
+
+
 spheretrace_result spheretrace(
     const scene_data& scene, const sdf& sdf_scene, const ray3f& ray) {
   auto   t = ray.tmin;
   op_res min_d;
-  for (int i = 0; i < 170 && t < ray.tmax; ++i) {
+  for (int i = 0; i < 180 && t < ray.tmax; ++i) {
     const auto& p = ray_point(ray, t);
-    for (const auto& instance : scene.vol_instances) {
-      const auto& volume = scene.volumes[instance.volume];
-      vec3f       whd    = {static_cast<float>(volume.width),
-          static_cast<float>(volume.height), static_cast<float>(volume.depth)};
-
-      if (sd_box(p - instance.frame.o, whd) < 1e10) {
-        vec3f uvw = p - instance.frame.o / whd;
-        float sdf = eval_volume(volume, uvw);
-        if (abs(sdf) < (yocto::flt_eps * t))
-          return {true, t, instance.material};
-      }
-    }
-    auto min_d = sdf_scene(p);
-
-    if (abs(min_d) < (yocto::flt_eps * t)) return {true, t, min_d.material};
+    const auto& instance = scene.vol_instances[0];
+    const auto& volume = scene.volumes[instance.volume];
+    min_d.material            = instance.material;
+    vec3f       whd           = {volume.whd.x, volume.whd.y, volume.whd.z};
+    min_d.d                = eval_sdf(volume, instance, p, t);
+    
+    if (abs(min_d) < (flt_eps * t)) return {true, t, min_d.material};
     t += min_d;
   }
 
@@ -400,7 +394,7 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
     // prepare shading point
     auto outgoing = -ray.d;
     auto position = ray_point(ray, intersection.dist);
-    auto normal   = eval_sdf_normal(scene.implicits[0], position);
+    auto normal   = eval_sdf_normal(scene.volumes[0], scene.vol_instances[0], position, intersection.dist);
     auto material = eval_material(scene, intersection.material);
     // handle opacity
     if (material.opacity < 1 && rand1f(rng) >= material.opacity) {
@@ -792,7 +786,7 @@ static vec4f shade_implicit_normal(const scene_data& scene, const bvh_data& bvh,
   // prepare shading point
   auto outgoing = -ray.d;
   auto position = ray_point(ray, intersection.dist);
-  auto normal   = eval_sdf_normal(scene.implicits[0], position) * 0.5 + 0.5;
+  auto normal   = eval_sdf_normal(scene.volumes[0], scene.vol_instances[0], position, intersection.dist) * 0.5 + 0.5;
   return {normal.x, normal.y, normal.z, 1};
 }
 

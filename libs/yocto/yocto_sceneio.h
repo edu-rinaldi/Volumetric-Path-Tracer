@@ -144,6 +144,8 @@ io_status save_fvshape(const string& filename, const fvshape_data& shape,
 shape_data   make_shape_preset(const string& type);
 fvshape_data make_fvshape_preset(const string& type);
 
+bool load_volume(const string& filename, volume<float>& vol, string& error);
+
 // Load/save a shape
 bool load_shape(const string& filename, shape_data& shape, string& error,
     bool flip_texcoords = true);

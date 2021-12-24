@@ -193,16 +193,18 @@ struct op_res;
 
 template <typename T>
 struct volume {
-  int            height;
-  int            width;
-  int            depth;
+  vec3i          whd;
   std::vector<T> vol;
+  float          res;
 
-  inline vec3i size() const { return {width, height, depth}; }
+  inline vec3i size() const { return whd; }
   inline bool  empty() const { return vol.empty(); }
   // x + WIDTH * (y + DEPTH * z)
-  inline T operator[](const vec3i& uvw) const {
-    return vol[uvw.x + width * (uvw.y + depth * uvw.z)];
+  inline T operator[](const vec3i& xyz) const {
+      // i + j * WIDTH + k * WIDTH * HEIGHT
+    return vol[xyz.x + xyz.y * whd.x + xyz.z * whd.x * whd.y];
+      // z * res.x * res.y + y * res.x + x
+    //return vol[xyz.z * whd.x * whd.y + xyz.y * whd.x + xyz.x];
   }
 };
 
@@ -210,6 +212,7 @@ struct volume_instance {
   int     volume   = invalidid;
   int     material = invalidid;
   frame3f frame;
+  vec3f   size;
 };
 
 struct scene_data {
@@ -224,15 +227,18 @@ struct scene_data {
   vector<volume<float>>                       volumes       = {};
   vector<volume_instance>                     vol_instances = {};
   vector<std::function<op_res(const vec3f&)>> implicits     = {};
+  
   // names (this will be cleanup significantly later)
-  vector<string> camera_names      = {};
-  vector<string> texture_names     = {};
-  vector<string> material_names    = {};
-  vector<string> shape_names       = {};
-  vector<string> instance_names    = {};
-  vector<string> environment_names = {};
-  vector<string> subdiv_names      = {};
-  vector<string> implicit_names    = {};
+  vector<string> camera_names        = {};
+  vector<string> texture_names       = {};
+  vector<string> material_names      = {};
+  vector<string> shape_names         = {};
+  vector<string> instance_names      = {};
+  vector<string> environment_names   = {};
+  vector<string> subdiv_names        = {};
+  vector<string> volume_names        = {};
+  vector<string> vol_instances_names = {};
+  vector<string> implicit_names      = {};
 
   // copyright info preserve in IO
   string copyright = "";

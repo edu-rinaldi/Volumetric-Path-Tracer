@@ -17,10 +17,12 @@ struct op_res {
   int   material = invalidid;
         operator float() { return d; }
 };
-
+float eval_sdf(const volume<float>& volume, const volume_instance& instance,
+    const vec3f& p, float t);
 vec3f eval_sdf_normal(const sdf& sdf, const vec3f& p);
+vec3f eval_sdf_normal(const volume<float>& volume, const volume_instance& instance, const vec3f& p, float t);
 
-inline float lookup_volume(const volume<float>& vol, const vec3i& ijk) {
+inline float lookup_volume(const volume<float>& vol,const vec3i& ijk) {
   return vol[ijk];
 }
 

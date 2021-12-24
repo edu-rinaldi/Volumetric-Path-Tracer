@@ -38,6 +38,7 @@
 #include <memory>
 #include <stdexcept>
 #include <unordered_map>
+#include <fstream>
 
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
 #include "ext/json.hpp"
@@ -879,6 +880,93 @@ bool save_volume(
 // SHAPE IO
 // -----------------------------------------------------------------------------
 namespace yocto {
+
+bool load_volume(const string& filename, volume<float>& vol, string& error) {
+  auto read_error = [filename, &error]() {
+    error = filename + ": read error";
+    return false;
+  };
+  auto width = 0, height = 0, depth = 0, ncomp = 0;
+  auto voxels = vector<float>{};
+  
+  // Split a string
+  auto split_string = [](const string& str) -> vector<string> {
+    auto ret = vector<string>();
+    if (str.empty()) return ret;
+    auto lpos = (size_t)0;
+    while (lpos != string::npos) {
+      auto pos = str.find_first_of(" \t\n\r", lpos);
+      if (pos != string::npos) {
+        if (pos > lpos) ret.push_back(str.substr(lpos, pos - lpos));
+        lpos = pos + 1;
+      } else {
+        if (lpos < str.size()) ret.push_back(str.substr(lpos));
+        lpos = pos;
+      }
+    }
+    return ret;
+  };
+
+  
+  #if 0
+  std::string   line;
+  std::ifstream vol_file(filename);
+  if (vol_file.fail()) return read_error();
+  bool          first = true;
+  int  count_line = 0;
+  while (getline(vol_file, line)) {
+    if (count_line == 0) {
+      auto whd = split_string(line);
+      width    = atoi(whd[0].c_str());
+      height   = atoi(whd[1].c_str());
+      depth    = atoi(whd[2].c_str());
+      first    = false;
+      count_line++;
+    } 
+    else if (count_line == 1) {
+      count_line++;
+    }
+    else {
+      auto distances = split_string(line);
+      
+      std::transform(distances.begin(), distances.end(),
+          std::back_inserter(vol.vol),
+          [](const string& s) { return atof(s.c_str()); });
+    }
+  }
+  vol_file.close();
+  vol.whd = {width, height, depth};
+  return true;
+#else
+  std::ifstream f(filename, std::ios::binary);
+  assert(f.is_open());
+  f.read((char*)&width, sizeof(int32_t));
+  f.read((char*)&height, sizeof(int32_t));
+  f.read((char*)&depth, sizeof(int32_t));
+  
+  f.read((char*)&vol.res, sizeof(float));
+  mat4f mat;
+  f.read((char*)&mat, 16 * sizeof(float));
+
+  int n_elems = width * height * depth;
+
+  vol.vol.resize(n_elems);
+  f.read((char*)vol.vol.data(), n_elems * sizeof(float));
+
+  /*if (f && f.peek() != EOF) {
+    vol.vol.resize(n_elems);
+    f.read((char*)vol.vol.data(), n_elems * sizeof(float));
+  }*/
+
+  f.close();
+  vol.whd = {width, height, depth};
+  return true;
+#endif
+
+  
+  
+}
+
 
 // Load mesh
 bool load_shape(const string& filename, shape_data& shape, string& error,
@@ -3464,6 +3552,7 @@ static bool load_json_scene(
 
   // filenames
   auto shape_filenames   = vector<string>{};
+  auto volume_filenames  = vector<string>{};
   auto texture_filenames = vector<string>{};
   auto subdiv_filenames  = vector<string>{};
 
@@ -3550,20 +3639,19 @@ static bool load_json_scene(
         get_opt(element, "uri", uri);
       }
     }
-    /*if (json.contains("implicits")) {
-      auto& group = json.at("implicits");
-      scene.implicits.reserve(group.size());
-      scene.implicit_names.reserve(group.size());
-      for (auto& element : group)
-      {
-        auto& implicit = scene.implicits.emplace_back();
-        auto& name     = scene.implicit_names.emplace_back();
-        sdf_type type;
-        get_opt(element, "name", name);
-        get_opt(element, "type", type);
+    if (json.contains("volumes")) {
+      auto& group = json.at("volumes");
+      scene.volumes.reserve(group.size());
+      volume_filenames.reserve(group.size());
 
+      for (auto& element : group) {
+        [[maybe_unused]] auto& shape = scene.volumes.emplace_back();
+        auto&                  name  = scene.volume_names.emplace_back();
+        auto&                  uri   = volume_filenames.emplace_back();
+        get_opt(element, "name", name);
+        get_opt(element, "uri", uri);
       }
-    }*/
+    }
     if (json.contains("subdivs")) {
       auto& group = json.at("subdivs");
       scene.subdivs.reserve(group.size());
@@ -3593,6 +3681,20 @@ static bool load_json_scene(
         get_opt(element, "name", name);
         get_opt(element, "frame", instance.frame);
         get_opt(element, "shape", instance.shape);
+        get_opt(element, "material", instance.material);
+      }
+    }
+    if (json.contains("vol_instances")) {
+      auto& group = json.at("vol_instances");
+      scene.vol_instances.reserve(group.size());
+      scene.vol_instances_names.reserve(group.size());
+      for (auto& element : group) {
+        auto& instance = scene.vol_instances.emplace_back();
+        auto& name     = scene.vol_instances_names.emplace_back();
+        get_opt(element, "name", name);
+        get_opt(element, "frame", instance.frame);
+        get_opt(element, "size", instance.size);
+        get_opt(element, "volume", instance.volume);
         get_opt(element, "material", instance.material);
       }
     }
@@ -3628,6 +3730,12 @@ static bool load_json_scene(
               scene.shapes[idx], error, true))
         return dependent_error();
     }
+    for(auto idx : range(scene.volumes.size())) {
+      if (!load_volume(path_join(dirname, volume_filenames[idx]),
+              scene.volumes[idx], error))
+        return dependent_error();
+    }
+
     // load subdivs
     for (auto idx : range(scene.subdivs.size())) {
       if (!load_subdiv(path_join(dirname, subdiv_filenames[idx]),
@@ -3648,6 +3756,12 @@ static bool load_json_scene(
                   scene.shapes[idx], error, true);
             }))
       return dependent_error();
+    if (!parallel_for(
+            scene.volumes.size(), error, [&](size_t idx, string& error) {
+              return load_volume(path_join(dirname, volume_filenames[idx]),
+                  scene.volumes[idx], error);
+            }))
+        return dependent_error();
     // load subdivs
     if (!parallel_for(
             scene.subdivs.size(), error, [&](size_t idx, string& error) {
