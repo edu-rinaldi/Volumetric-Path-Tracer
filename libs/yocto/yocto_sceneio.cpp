@@ -53,6 +53,7 @@
 #include "yocto_parallel.h"
 #include "yocto_shading.h"
 #include "yocto_shape.h"
+#include "yocto_sdfs.h"
 
 // -----------------------------------------------------------------------------
 // USING DIRECTIVES
@@ -887,7 +888,6 @@ bool load_volume(const string& filename, volume<float>& vol, bool binary, string
     return false;
   };
   auto width = 0, height = 0, depth = 0, ncomp = 0;
-  auto voxels = vector<float>{};
   
   // Split a string
   auto split_string = [](const string& str) -> vector<string> {
@@ -927,7 +927,6 @@ bool load_volume(const string& filename, volume<float>& vol, bool binary, string
       }
       else if (count_line == 2) {
         vol.res = atof(line.c_str());
-        printf("%g\n", vol.res);
         count_line++;
       } else {
         auto distances = split_string(line);
@@ -2938,6 +2937,16 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
                        {material_type::gltfpbr, "gltfpbr"},
                    })
 
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    sdf_type, {
+                  {sdf_type::bbox, "bbox"},
+                  {sdf_type::box, "box"},
+                  {sdf_type::capped_cone, "capped_cone"},
+                  {sdf_type::plane, "plane"},
+                  {sdf_type::sphere, "sphere"},
+                  {sdf_type::torus, "torus"},
+              })
+
 // Load a scene in the builtin JSON format.
 static bool load_json_scene_version40(const string& filename,
     const json_value& json, scene_data& scene, string& error, bool noparallel) {
@@ -3557,7 +3566,7 @@ static bool load_json_scene(
   auto subdiv_filenames  = vector<string>{};
 
   // bool binary volume file
-  bool binary_vol = false;
+  auto binary_vol = vector<bool>{};
 
   // errors
   auto parse_error = [&filename, &error]() {
@@ -3645,15 +3654,80 @@ static bool load_json_scene(
     if (json.contains("volumes")) {
       auto& group = json.at("volumes");
       scene.volumes.reserve(group.size());
+      scene.volume_names.reserve(group.size());
       volume_filenames.reserve(group.size());
-
+      binary_vol.reserve(group.size());
       for (auto& element : group) {
         [[maybe_unused]] auto& shape = scene.volumes.emplace_back();
         auto&                  name  = scene.volume_names.emplace_back();
         auto&                  uri   = volume_filenames.emplace_back();
+        bool                   binary;
         get_opt(element, "name", name);
-        get_opt(element, "binary", binary_vol);
+        get_opt(element, "binary", binary);
+        binary_vol.push_back(binary);
         get_opt(element, "uri", uri);
+      }
+    }
+    if (json.contains("sdfunctions")) {
+      auto& group = json.at("sdfunctions");
+      scene.sdfs.reserve(group.size());
+      scene.sdfs_names.reserve(group.size());
+      for(auto& element : group) {
+        auto&    sdf      = scene.sdfs.emplace_back();
+        auto&    name     = scene.sdfs_names.emplace_back();
+        sdf_type type;
+        get_opt(element, "name", name);
+        get_opt(element, "type", type);
+        get_opt(element, "frame", sdf.frame);
+        get_opt(element, "material", sdf.material);
+        // Initialize sdfunction
+        switch (type) {
+          case sdf_type::bbox: {
+            float thickness;
+            vec3f whd;
+            get_opt(element, "thickness", thickness);
+            get_opt(element, "whd", whd);
+            sdf.f = [thickness, whd](
+                        const vec3f& p) { return sd_bbox(p, whd, thickness); };
+            break;
+          }
+          case sdf_type::box: {
+            vec3f whd;
+            get_opt(element, "whd", whd);
+            sdf.f = [whd](const vec3f& p) {
+              return sd_box(p - (whd * 0.5f), whd * 0.5f);
+            };
+            break;
+          }
+          case sdf_type::capped_cone: {
+            float height, r1, r2;
+            get_opt(element, "height", height);
+            get_opt(element, "r1", r1);
+            get_opt(element, "r2", r2);
+            sdf.f = [height, r1, r2](const vec3f& p) {
+              return sd_capped_cone(p, height, r1, r2);
+            };
+            break;
+          }
+          case sdf_type::plane: {
+            sdf.f = [](const vec3f& p) { return sd_plane(p); };
+            break;
+          }
+          case sdf_type::sphere: {
+            float radius;
+            get_opt(element, "radius", radius);
+            sdf.f = [radius](const vec3f& p) { return sd_sphere(p, radius); };
+            break;
+          }
+          case sdf_type::torus: {
+            float r1, r2;
+            get_opt(element, "r1", r1);
+            get_opt(element, "r2", r2);
+            sdf.f = [r1, r2](const vec3f& p) { return sd_torus(p, r1, r2); };
+            break;
+          }
+          default: return parse_error();
+        }
       }
     }
     if (json.contains("subdivs")) {
@@ -3736,7 +3810,7 @@ static bool load_json_scene(
     }
     for(auto idx : range(scene.volumes.size())) {
       if (!load_volume(path_join(dirname, volume_filenames[idx]),
-              scene.volumes[idx], binary_vol, error))
+              scene.volumes[idx], binary_vol[idx], error))
         return dependent_error();
     }
 
@@ -3763,7 +3837,7 @@ static bool load_json_scene(
     if (!parallel_for(
             scene.volumes.size(), error, [&](size_t idx, string& error) {
               return load_volume(path_join(dirname, volume_filenames[idx]),
-                  scene.volumes[idx], binary_vol, error);
+                  scene.volumes[idx], binary_vol[idx], error);
             }))
         return dependent_error();
     // load subdivs
@@ -3781,7 +3855,6 @@ static bool load_json_scene(
             }))
       return dependent_error();
   }
-
   // fix scene
   add_missing_camera(scene);
   add_missing_radius(scene);

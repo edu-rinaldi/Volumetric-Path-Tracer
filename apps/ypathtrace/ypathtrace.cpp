@@ -96,37 +96,6 @@ void run_interactive(const string& filename, const string& output,
   auto error = string{};
   auto scene = scene_data{};
   if (!load_scene(filename, scene, error)) print_fatal(error);
-
-  auto fscene = [](const vec3f& p) {
-    op_res res = {1e10, -1};
-
-    /*res = op_union(res, {sd_sphere(p - vec3f{-2.0, 0.25, 0.0}, 0.25), 3});*/
-
-    // bounding box
-    if (sd_box(p - vec3f{0.0, 0.3, -1.0}, vec3f{0.35, 0.3, 2.5}) < res) {
-      // more primitives
-      res = op_union(
-          res, {sd_box(p - vec3f{0.0, 0.25, 0.0}, vec3f{0.3, 0.25, 0.2}), 3});
-      vec3f ptorus = (p - vec3f{0.0, 0.30, 1.0});
-      res          = op_union(res,
-                   {sd_torus({ptorus.x, ptorus.z, ptorus.y}, vec2f{0.25, 0.05}), 4});
-      res          = op_union(
-                   res, {sd_cone(p - vec3f{0.0, 0.45, -1.0}, vec2f{0.6, 0.8}, 0.45), 4});
-      res = op_union(res,
-          {sd_capped_cone(p - vec3f{0.0, 0.25, -2.0}, 0.25f, 0.25f, 0.1f), 3});
-      res = op_union(res,
-          {sd_solid_angle(p - vec3f{0.0, 0.00, -3.0}, vec2f{3, 4} / 5.0f, 0.4),
-              4});
-      res = op_union(res,
-          {sd_box(p - vec3f{0, 0.5, -1.0}, vec3f{0.2, 0.15, yocto::flt_eps}),
-              2});
-    }
-
-    return res;
-  };
-
-  scene.implicits.push_back(fscene);
-
   print_progress_end();
 
   // camera
@@ -270,6 +239,8 @@ void run_interactive(const string& filename, const string& output,
       edited += draw_glslider("samples", tparams.samples, 16, 4096);
       edited += draw_glcombobox(
           "shader", (int&)tparams.shader, pathtrace_shader_names);
+      if (tparams.shader == pathtrace_shader_type::implicit)
+        edited += draw_glcheckbox("Implicit MIS", tparams.implicit_mis);
       edited += draw_glslider("bounces", tparams.bounces, 1, 128);
       continue_glline();
       edited += draw_glslider("pratio", tparams.pratio, 1, 64);
@@ -347,6 +318,7 @@ void run(const vector<string>& args) {
   add_option(cli, "samples", params.samples, "Number of samples.", {1, 4096});
   add_option(cli, "bounces", params.bounces, "Number of bounces.", {1, 128});
   add_option(cli, "noparallel", params.noparallel, "Disable threading.");
+  add_option(cli, "implicitmis", params.implicit_mis, "Enable MIS on implicit shader");
   parse_cli(cli, args);
 
   // run

@@ -94,6 +94,7 @@ struct pathtrace_params {
   int                   pratio     = 8;
   float                 exposure   = 0;
   bool                  filmic     = false;
+  bool                  implicit_mis = true;
 };
 
 const auto pathtrace_shader_names = vector<string>{"volpathtrace", "pathtrace",
@@ -103,6 +104,7 @@ const auto pathtrace_shader_names = vector<string>{"volpathtrace", "pathtrace",
 struct pathtrace_light {
   int           instance     = invalidid;
   int           environment  = invalidid;
+  int           sdf          = invalidid;
   vector<float> elements_cdf = {};
 };
 

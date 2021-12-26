@@ -189,7 +189,14 @@ struct subdiv_data {
 // environment. In that case, the element transforms are computed from
 // the hierarchy. Animation is also optional, with keyframe data that
 // updates node transformations only if defined.
-struct op_res;
+
+
+struct sdf_data 
+{
+  int material = invalidid;
+  frame3f                            frame;
+  std::function<float(const vec3f&)> f;
+};
 
 template <typename T>
 struct volume {
@@ -217,16 +224,17 @@ struct volume_instance {
 
 struct scene_data {
   // scene elements
-  vector<camera_data>                         cameras       = {};
-  vector<instance_data>                       instances     = {};
-  vector<environment_data>                    environments  = {};
-  vector<shape_data>                          shapes        = {};
-  vector<texture_data>                        textures      = {};
-  vector<material_data>                       materials     = {};
-  vector<subdiv_data>                         subdivs       = {};
-  vector<volume<float>>                       volumes       = {};
-  vector<volume_instance>                     vol_instances = {};
-  vector<std::function<op_res(const vec3f&)>> implicits     = {};
+  vector<camera_data>                         cameras        = {};
+  vector<instance_data>                       instances      = {};
+  vector<environment_data>                    environments   = {};
+  vector<shape_data>                          shapes         = {};
+  vector<texture_data>                        textures       = {};
+  vector<material_data>                       materials      = {};
+  vector<subdiv_data>                         subdivs        = {};
+  vector<volume<float>>                       volumes        = {};
+  vector<volume_instance>                     vol_instances  = {};
+  vector<sdf_data>                            sdfs           = {};
+  // vector<int>                                 sdfs_materials = {};
   
   // names (this will be cleanup significantly later)
   vector<string> camera_names        = {};
@@ -238,7 +246,7 @@ struct scene_data {
   vector<string> subdiv_names        = {};
   vector<string> volume_names        = {};
   vector<string> vol_instances_names = {};
-  vector<string> implicit_names      = {};
+  vector<string> sdfs_names          = {};
 
   // copyright info preserve in IO
   string copyright = "";
