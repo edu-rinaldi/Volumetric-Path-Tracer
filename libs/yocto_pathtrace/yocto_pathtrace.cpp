@@ -263,34 +263,11 @@ struct spheretrace_result {
   int   sdf      = invalidid;
 };
 
-//spheretrace_result eval_sdf_scene(
-//    const scene_data& scene, const vec3f& p, float t) {
-//  spheretrace_result res;
-//  res.dist = 1e10;
-//  for (const auto& [idx, instance] : enumerate(scene.vol_instances)) {
-//    const auto& volume       = scene.volumes[instance.volume];
-//    float       instance_sdf = eval_sdf(
-//        volume, instance, transform_point(instance.frame, p), t);
-//
-//    if (instance_sdf < res.dist) {
-//      res = {false, instance_sdf, instance.material, (int)idx, invalidid};
-//    }
-//  }
-//  
-//  for (auto& [idx, sdfunc] : enumerate(scene.sdfs)) {
-//    auto sdf = sdfunc.f(transform_point(sdfunc.frame, p));
-//    if (sdf < res.dist) {
-//      res = {false, sdf, sdfunc.material, invalidid, (int)idx};
-//    }
-//  }
-//
-//  return res;
-//}
-
-spheretrace_result spheretrace(const scene_data& scene, const ray3f& ray, int sdf_handle) {
-  auto t = ray.tmin;
+spheretrace_result spheretrace(
+    const scene_data& scene, const ray3f& ray, int sdf_handle, int maxiter) {
+  auto t   = ray.tmin;
   auto sdf = scene.sdfs[sdf_handle];
-  for (int i = 0; i < 300 && t < ray.tmax; ++i) {
+  for (int i = 0; i < maxiter && t < ray.tmax; ++i) {
     if (t >= ray.tmax) return {};
     const auto& p   = ray_point(ray, t);
     auto        res = sdf.f(transform_point(sdf.frame, p));
@@ -302,9 +279,10 @@ spheretrace_result spheretrace(const scene_data& scene, const ray3f& ray, int sd
   return {};
 }
 
-spheretrace_result spheretrace(const scene_data& scene, const ray3f& ray) {
+spheretrace_result spheretrace(
+    const scene_data& scene, const ray3f& ray, int maxiter) {
   auto t = ray.tmin;
-  for (int i = 0; i < 300 && t < ray.tmax; ++i) {
+  for (int i = 0; i < maxiter && t < ray.tmax; ++i) {
     if (t >= ray.tmax) return {};
     const auto& p   = ray_point(ray, t);
     auto        res = eval_sdf_scene(scene, p, t);
@@ -331,15 +309,12 @@ static vec3f sample_lights(const scene_data& scene,
     auto  uv        = (!shape.triangles.empty()) ? sample_triangle(ruv) : ruv;
     auto  lposition = eval_position(scene, instance, element, uv);
     return normalize(lposition - position);
-  } 
-  else if (light.sdf != invalidid) {
-    frame3f frame = scene.sdfs[light.sdf].frame;
-    return normalize(
-        transform_point(inverse(frame),
-            vec3f{ruv.x, ruv.y, 1} * vec3f{0.5, 0.4, 0.000000000000001f}) -
-        position);
-  }
-  else if (light.environment != invalidid) {
+  } else if (light.sdf != invalidid) {
+    const auto& sdf     = scene.sdfs[light.sdf];
+    auto        wlightp = transform_point(
+        inverse(sdf.frame), vec3f{ruv.x, ruv.y, 1} * sdf.whd);
+    return normalize(wlightp - position);
+  } else if (light.environment != invalidid) {
     auto& environment = scene.environments[light.environment];
     if (environment.emission_tex != invalidid) {
       auto& emission_tex = scene.textures[environment.emission_tex];
@@ -352,8 +327,7 @@ static vec3f sample_lights(const scene_data& scene,
     } else {
       return sample_sphere(ruv);
     }
-  }
-  else {
+  } else {
     return {0, 0, 0};
   }
 }
@@ -361,7 +335,7 @@ static vec3f sample_lights(const scene_data& scene,
 // Sample lights pdf
 static float sample_lights_pdf(const scene_data& scene, const bvh_data& bvh,
     const pathtrace_lights& lights, const vec3f& position,
-    const vec3f& direction) {
+    const vec3f& direction, int spheretrace_maxiter) {
   auto pdf = 0.0f;
   for (auto& light : lights.lights) {
     if (light.instance != invalidid) {
@@ -386,6 +360,19 @@ static float sample_lights_pdf(const scene_data& scene, const bvh_data& bvh,
         next_position = lposition + direction * 1e-3f;
       }
       pdf += lpdf;
+    } else if (light.sdf != invalidid) {
+      ray3f       ray          = {position, direction};
+      const auto& sdf          = scene.sdfs[light.sdf];
+      auto        intersection = spheretrace(
+          scene, ray, light.sdf, spheretrace_maxiter);
+      if (intersection.hit) {
+        vec3f lposition = ray_point(ray, intersection.dist);
+        vec3f lnormal   = eval_sdf_normal(
+            scene.sdfs[intersection.sdf], position, intersection.dist);
+        auto area = light.elements_cdf.back();
+        pdf += distance_squared(lposition, position) /
+               (abs(dot(lnormal, direction)) * area);
+      }
     } else if (light.environment != invalidid) {
       auto& environment = scene.environments[light.environment];
       if (environment.emission_tex != invalidid) {
@@ -397,7 +384,7 @@ static float sample_lights_pdf(const scene_data& scene, const bvh_data& bvh,
         auto i = clamp(
             (int)(texcoord.x * emission_tex.width), 0, emission_tex.width - 1);
         auto j    = clamp((int)(texcoord.y * emission_tex.height), 0,
-               emission_tex.height - 1);
+            emission_tex.height - 1);
         auto prob = sample_discrete_pdf(
                         light.elements_cdf, j * emission_tex.width + i) /
                     light.elements_cdf.back();
@@ -407,17 +394,6 @@ static float sample_lights_pdf(const scene_data& scene, const bvh_data& bvh,
         pdf += prob / angle;
       } else {
         pdf += 1 / (4 * pif);
-      }
-    } else if (light.sdf != invalidid) {
-      ray3f ray          = {position, direction};
-      auto intersection = spheretrace(scene, ray, light.sdf);
-      if (intersection.hit) {
-        vec3f  lposition = ray_point(ray, intersection.dist);
-        vec3f lnormal = eval_sdf_normal(scene.sdfs[intersection.sdf], position, intersection.dist);
-        auto area = light.elements_cdf.back();
-        pdf += distance_squared(lposition, position) /
-                (abs(dot(lnormal, direction)) * area);
-        //pdf += 1;
       }
     }
   }
@@ -437,25 +413,29 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
     // intersect next point
-    const auto& intersection = spheretrace(scene, ray);
+    const auto& intersection = spheretrace(
+        scene, ray, params.spheretrace_maxiter);
     if (!intersection.hit) {
       radiance += weight * eval_environment(scene, ray.d);
       break;
     }
 
-     // prepare shading point
-    auto  outgoing = -ray.d;
-    auto  position = ray_point(ray, intersection.dist);
+    // prepare shading point
+    auto outgoing = -ray.d;
+    auto position = ray_point(ray, intersection.dist);
 
-    vec3f normal = eval_sdf_normal(scene, position, intersection.dist);
-    /*if (intersection.instance != invalidid) {
+    // vec3f normal = eval_sdf_normal(scene, position, intersection.dist);
+    vec3f normal;
+    if (intersection.instance != invalidid) {
       const auto& instance = scene.vol_instances[intersection.instance];
       const auto& volume   = scene.volumes[instance.volume];
       normal = eval_sdf_normal(volume, instance, position, intersection.dist);
     } else
-      normal = eval_sdf_normal(scene.sdfs[intersection.sdf], position, intersection.dist);*/
-    
-    int material_handle = intersection.instance != invalidid
+      normal = eval_sdf_normal(
+          scene.sdfs[intersection.sdf], position, intersection.dist);
+
+    int material_handle =
+        intersection.instance != invalidid
             ? scene.vol_instances[intersection.instance].material
             : scene.sdfs[intersection.sdf].material;
 
@@ -476,7 +456,7 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
     // next direction
     auto incoming = vec3f{0, 0, 0};
     if (!is_delta(material)) {
-      if (rand1f(rng) < (params.implicit_mis ? 0.5f : 1.0f)) {
+      if (rand1f(rng) < (params.noimplicit_mis ? 1.0f : 0.5f)) {
         incoming = sample_bsdfcos(
             material, normal, outgoing, rand1f(rng), rand2f(rng));
       } else {
@@ -484,16 +464,16 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
             scene, lights, position, rand1f(rng), rand1f(rng), rand2f(rng));
       }
       if (incoming == vec3f{0, 0, 0}) break;
-      if (params.implicit_mis) {
+      if (!params.noimplicit_mis) {
         weight *=
             eval_bsdfcos(material, normal, outgoing, incoming) /
             (0.5f * sample_bsdfcos_pdf(material, normal, outgoing, incoming) +
-                0.5f *
-                    sample_lights_pdf(scene, bvh, lights, position, incoming));
+                0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming,
+                           params.spheretrace_maxiter));
       } else
         weight *= eval_bsdfcos(material, normal, outgoing, incoming) /
                   sample_bsdfcos_pdf(material, normal, outgoing, incoming);
-      
+
     } else {
       incoming = sample_delta(material, normal, outgoing, rand1f(rng));
       weight *= eval_delta(material, normal, outgoing, incoming) /
@@ -514,6 +494,33 @@ static vec4f shade_implicit(const scene_data& scene, const bvh_data& bvh,
   }
 
   return {radiance.x, radiance.y, radiance.z, 1};
+}
+
+// Normal for debugging.
+static vec4f shade_implicit_normal(const scene_data& scene, const bvh_data& bvh,
+    const pathtrace_lights& lights, const ray3f& ray, rng_state& rng,
+    const pathtrace_params& params) {
+  const auto& intersection = spheretrace(
+      scene, ray, params.spheretrace_maxiter);
+
+  if (!intersection.hit) {
+    return zero4f;
+  }
+  // prepare shading point
+  auto outgoing = -ray.d;
+  auto position = ray_point(ray, intersection.dist);
+
+  vec3f normal;
+  if (intersection.instance != invalidid) {
+    const auto& instance = scene.vol_instances[intersection.instance];
+    const auto& volume   = scene.volumes[instance.volume];
+    normal = eval_sdf_normal(volume, instance, position, intersection.dist);
+  } else
+    normal = eval_sdf_normal(
+        scene.sdfs[intersection.sdf], position, intersection.dist);
+
+  normal = normal * 0.5 + 0.5;
+  return {normal.x, normal.y, normal.z, 1};
 }
 
 // Recursive path tracing.
@@ -542,7 +549,7 @@ static vec4f shade_volpathtrace(const scene_data& scene, const bvh_data& bvh,
     if (!vstack.empty()) {
       const vec3f& density  = vstack.back().density;
       float        distance = sample_transmittance(
-                 density, intersection.distance, rand1f(rng), rand1f(rng));
+          density, intersection.distance, rand1f(rng), rand1f(rng));
       weight *= eval_transmittance(density, distance) /
                 sample_transmittance_pdf(
                     density, distance, intersection.distance);
@@ -585,8 +592,8 @@ static vec4f shade_volpathtrace(const scene_data& scene, const bvh_data& bvh,
         weight *=
             eval_bsdfcos(material, normal, outgoing, incoming) /
             (0.5f * sample_bsdfcos_pdf(material, normal, outgoing, incoming) +
-                0.5f *
-                    sample_lights_pdf(scene, bvh, lights, position, incoming));
+                0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming,
+                           params.spheretrace_maxiter));
       } else {
         incoming = sample_delta(material, normal, outgoing, rand1f(rng));
         weight *= eval_delta(material, normal, outgoing, incoming) /
@@ -620,10 +627,10 @@ static vec4f shade_volpathtrace(const scene_data& scene, const bvh_data& bvh,
               ? sample_scattering(vol, outgoing, rand1f(rng), rand2f(rng))
               : sample_lights(scene, lights, position, rand1f(rng), rand1f(rng),
                     rand2f(rng));
-      weight *=
-          eval_scattering(vol, outgoing, incoming) /
-          (0.5f * sample_scattering_pdf(vol, outgoing, incoming) +
-              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming));
+      weight *= eval_scattering(vol, outgoing, incoming) /
+                (0.5f * sample_scattering_pdf(vol, outgoing, incoming) +
+                    0.5f * sample_lights_pdf(scene, bvh, lights, position,
+                               incoming, params.spheretrace_maxiter));
       ray = {position, incoming};  // setup recurse
     }
 
@@ -692,7 +699,8 @@ static vec4f shade_pathtrace(const scene_data& scene, const bvh_data& bvh,
       weight *=
           eval_bsdfcos(material, normal, outgoing, incoming) /
           (0.5f * sample_bsdfcos_pdf(material, normal, outgoing, incoming) +
-              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming));
+              0.5f * sample_lights_pdf(scene, bvh, lights, position, incoming,
+                         params.spheretrace_maxiter));
     } else {
       incoming = sample_delta(material, normal, outgoing, rand1f(rng));
       weight *= eval_delta(material, normal, outgoing, incoming) /
@@ -844,31 +852,6 @@ static vec4f shade_eyelight(const scene_data& scene, const bvh_data& bvh,
 }
 
 // Normal for debugging.
-static vec4f shade_implicit_normal(const scene_data& scene, const bvh_data& bvh,
-    const pathtrace_lights& lights, const ray3f& ray, rng_state& rng,
-    const pathtrace_params& params) {
-  const auto& intersection = spheretrace(scene, ray);
-
-  if (!intersection.hit) {
-    return zero4f;
-  }
-  // prepare shading point
-  auto outgoing = -ray.d;
-  auto position = ray_point(ray, intersection.dist);
-
-  vec3f normal = eval_sdf_normal(scene, position, intersection.dist);
-  /*if (intersection.instance != invalidid) {
-    const auto& instance = scene.vol_instances[intersection.instance];
-    const auto& volume   = scene.volumes[instance.volume];
-    normal = eval_sdf_normal(volume, instance, position, intersection.dist);
-  } else
-    normal = eval_sdf_normal(scene.sdfs[intersection.sdf], position, intersection.dist);*/
-  
-  normal = normal * 0.5 + 0.5;
-  return {normal.x, normal.y, normal.z, 1};
-}
-
-// Normal for debugging.
 static vec4f shade_normal(const scene_data& scene, const bvh_data& bvh,
     const pathtrace_lights& lights, const ray3f& ray, rng_state& rng,
     const pathtrace_params& params) {
@@ -1011,15 +994,16 @@ pathtrace_lights make_lights(
   }
 
   for (auto handle = 0; handle < scene.sdfs.size(); ++handle) {
-    auto& sdf = scene.sdfs[handle];
+    auto& sdf      = scene.sdfs[handle];
     auto& material = scene.materials[sdf.material];
     if (material.emission == vec3f{0, 0, 0}) continue;
     auto& light       = lights.lights.emplace_back();
     light.instance    = invalidid;
     light.environment = invalidid;
     light.sdf         = handle;
-    float area = quad_area(zero3f, {0.5, 0, 0}, {0, 0.4, 0}, {0.5, 0.4, 0});
-    light.elements_cdf = vector<float>{area};
+    // Do not consider z, since light is always aligned with x,y axes (x for
+    // width, y for height) and with nearly-zero depth
+    light.elements_cdf = vector<float>{sdf.whd.x * sdf.whd.y};
   }
 
   // handle progress

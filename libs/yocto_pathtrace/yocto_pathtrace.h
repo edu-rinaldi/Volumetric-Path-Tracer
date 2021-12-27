@@ -79,26 +79,28 @@ enum struct pathtrace_shader_type {
   normal,        // normals
   texcoord,      // texcoords
   color,         // colors
-  implicit,     // implicit
+  implicit,      // implicit
   implicit_normal,
 };
 
 // Options for trace functions
 struct pathtrace_params {
-  int                   camera     = 0;
-  int                   resolution = 720;
-  pathtrace_shader_type shader     = pathtrace_shader_type::pathtrace;
-  int                   samples    = 512;
-  int                   bounces    = 4;
-  bool                  noparallel = false;
-  int                   pratio     = 8;
-  float                 exposure   = 0;
-  bool                  filmic     = false;
-  bool                  implicit_mis = true;
+  int                   camera              = 0;
+  int                   resolution          = 720;
+  pathtrace_shader_type shader              = pathtrace_shader_type::pathtrace;
+  int                   samples             = 512;
+  int                   bounces             = 4;
+  bool                  noparallel          = false;
+  int                   pratio              = 8;
+  float                 exposure            = 0;
+  bool                  filmic              = false;
+  bool                  noimplicit_mis      = false;
+  int                   spheretrace_maxiter = 450;
 };
 
 const auto pathtrace_shader_names = vector<string>{"volpathtrace", "pathtrace",
-    "naive", "eyelight", "normal", "texcoord", "color", "implicit", "implicit_normal"};
+    "naive", "eyelight", "normal", "texcoord", "color", "implicit",
+    "implicit_normal"};
 
 // Scene lights used during rendering. These are created automatically.
 struct pathtrace_light {

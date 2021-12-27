@@ -195,6 +195,7 @@ struct sdf_data
 {
   int material = invalidid;
   frame3f                            frame;
+  vec3f                              whd;   // width-height-depth stored only for MIS area calc.
   std::function<float(const vec3f&)> f;
 };
 
@@ -206,13 +207,8 @@ struct volume {
 
   inline vec3i size() const { return whd; }
   inline bool  empty() const { return vol.empty(); }
-  // x + WIDTH * (y + DEPTH * z)
-  inline T operator[](const vec3i& xyz) const {
-      // i + j * WIDTH + k * WIDTH * HEIGHT
-    return vol[xyz.x + xyz.y * whd.x + xyz.z * whd.x * whd.y];
-      // z * res.x * res.y + y * res.x + x
-    //return vol[xyz.z * whd.x * whd.y + xyz.y * whd.x + xyz.x];
-  }
+  // i + j * WIDTH + k * WIDTH * HEIGHT
+  inline T operator[](const vec3i& xyz) const { return vol[xyz.x + xyz.y * whd.x + xyz.z * whd.x * whd.y]; }
 };
 
 struct volume_instance {

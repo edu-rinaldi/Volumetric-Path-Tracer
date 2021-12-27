@@ -3,32 +3,8 @@
 
 namespace yocto {
 
-// Eval sdf from volume
-float eval_sdf(const volume<float>& volume, const volume_instance& instance,
-    const vec3f& p, float t) {
-  
-  // Grid resolution
-  vec3f grid_res = {volume.whd.x, volume.whd.y, volume.whd.z};
-  const auto& origin   = instance.frame.o;
- 
-  // Calculate sdf bbox
-  auto  bbox_max      = origin + (volume.res * grid_res) * instance.scalef;
-  auto  bbox_size     = (bbox_max - origin);
-  float bbox_dist     = sd_box(p - (bbox_size/2.f), (bbox_size/2.f));
-  // If we hit bbox ==> calculate uvw and lookup volume (each voxel is a sdfield)
-  if (bbox_dist < flt_eps * t ) {
-    vec3f uvw = p * 2.f / (bbox_size)-1;
-    // eval_volume(..) is similar to texture(volumeSampler, uvw) in GLSL
-    return eval_volume(volume, uvw) * instance.scalef;
-  }
-  // Return distance from bbox
-  return bbox_dist;
-}
-
-// Eval all the SDFs in the scene
-sdf_result eval_sdf_scene(
-    const scene_data& scene, const vec3f& p, float t) 
-{
+// Eval all the SDFs in the scene at a given point p
+sdf_result eval_sdf_scene(const scene_data& scene, const vec3f& p, float t) {
   sdf_result res;
   // Evaluate sdf from grid
   for (const auto& [idx, instance] : enumerate(scene.vol_instances)) {
@@ -46,6 +22,29 @@ sdf_result eval_sdf_scene(
   }
 
   return res;
+}
+
+
+// Eval sdf from volume
+float eval_sdf(const volume<float>& volume, const volume_instance& instance,
+    const vec3f& p, float t) {
+  
+  // Grid resolution
+  vec3f grid_res = {volume.whd.x, volume.whd.y, volume.whd.z};
+  const auto& origin   = instance.frame.o;
+ 
+  // Calculate sdf bbox
+  auto  bbox_max      = origin + (volume.res * grid_res) * instance.scalef;
+  auto  bbox_size     = (bbox_max - origin);
+  float bbox_dist     = sd_box(p - (bbox_size * 0.5f), (bbox_size * 0.5f));
+  // If we hit bbox ==> calculate uvw and lookup volume (each voxel is a sdfield)
+  if (bbox_dist < flt_eps * t ) {
+    vec3f uvw = p * 2.f / (bbox_size)-1;
+    // eval_volume(..) is similar to texture(volumeSampler, uvw) in GLSL
+    return eval_volume(volume, uvw) * instance.scalef;
+  }
+  // Return distance from bbox
+  return bbox_dist;
 }
 
 // Eval normal given the scene
@@ -71,7 +70,7 @@ vec3f eval_sdf_normal(const sdf_data& sdf, const vec3f& p, float t) {
   return normalize(vec3f{1, -1, -1} * sdf.f(p1) + vec3f{-1, -1, 1} * sdf.f(p2) +
                    vec3f{-1, 1, -1} * sdf.f(p3) + vec3f{1, 1, 1} * sdf.f(p4));
 }
-// Eval normal of a sdfield
+// Eval normal of sdfields
 vec3f eval_sdf_normal(const volume<float>& volume,
     const volume_instance& instance, const vec3f& p, float t) {
   const float h = yocto::flt_eps * t;  // replace by an appropriate value
@@ -109,18 +108,18 @@ float eval_volume(const volume<float>& vol, const vec3f& uvw, bool no_interpolat
     i = u < 0.5 ? i : min(i + 1, vol.size().x - 1);
     j = v < 0.5 ? j : min(j + 1, vol.size().y - 1);
     k = w < 0.5 ? k : min(k + 1, vol.size().z - 1);
-    return lookup_volume(vol, {i, j, k});
+    return vol[{i, j, k}];
   }
 
   // trilinear interpolation
-  return lookup_volume(vol, {i, j, k}) * (1 - u) * (1 - v) * (1 - w) +
-         lookup_volume(vol, {ii, j, k}) * u * (1 - v) * (1 - w) +
-         lookup_volume(vol, {i, jj, k}) * (1 - u) * v * (1 - w) +
-         lookup_volume(vol, {i, j, kk}) * (1 - u) * (1 - v) * w +
-         lookup_volume(vol, {i, jj, kk}) * (1 - u) * v * w +
-         lookup_volume(vol, {ii, j, kk}) * u * (1 - v) * w +
-         lookup_volume(vol, {ii, jj, k}) * u * v * (1 - w) +
-         lookup_volume(vol, {ii, jj, kk}) * u * v * w;
+  return vol[{i, j, k}] * (1 - u) * (1 - v) * (1 - w) +
+         vol[{ii, j, k}] * u * (1 - v) * (1 - w) +
+         vol[{i, jj, k}] * (1 - u) * v * (1 - w) +
+         vol[{i, j, kk}] * (1 - u) * (1 - v) * w +
+         vol[{i, jj, kk}] * (1 - u) * v * w + 
+         vol[{ii, j, kk}] * u * (1 - v) * w + 
+         vol[{ii, jj, k}] * u * v * (1 - w) + 
+         vol[{ii, jj, kk}] * u * v * w;
 }
 
 

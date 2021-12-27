@@ -14,27 +14,31 @@ namespace yocto {
 typedef std::function<float(const vec3f&)> sdf;
 
 struct sdf_result {
-  float result = flt_max;
-  int   instance = invalidid;
-  int   sdf      = invalidid;
+  float result = flt_max;       // Distance to nearest sdf (either volume or sdfunction)
+  int   instance = invalidid;   // handle to nearest volume instance
+  int   sdf      = invalidid;   // handle to nearest sdfunction object
 };
 
+// SDFunction predefined types
+enum struct sdf_type { bbox, box, capped_cone, plane, sphere, torus };
+
+// Eval all the SDFs in the scene at a given point p
 sdf_result eval_sdf_scene(const scene_data& scene, const vec3f& p, float t);
 
+// Eval sdf from volume
 float eval_sdf(const volume<float>& volume, const volume_instance& instance, const vec3f& p, float t);
+
+// Eval normal given the scene
 vec3f eval_sdf_normal(const scene_data& scene, const vec3f& p, float t);
+// Eval the normal of a sdfunction
 vec3f eval_sdf_normal(const sdf_data& sdf, const vec3f& p, float t);
+// Eval normal of sdfields
 vec3f eval_sdf_normal(const volume<float>& volume, const volume_instance& instance, const vec3f& p, float t);
 
-inline float lookup_volume(const volume<float>& vol,const vec3i& ijk) {
-  return vol[ijk];
-}
-
-float eval_volume(
-    const volume<float>& vol, const vec3f& uvw, bool no_interpolation = false);
+float eval_volume(const volume<float>& vol, const vec3f& uvw, bool no_interpolation = false);
 
 
-enum struct sdf_type { bbox, box, capped_cone, plane, sphere, torus };
+// SDFunctions and operations inline definitions
 
 inline float sd_plane(const vec3f& p) { return p.y; }
 inline float sd_sphere(const vec3f& p, float s) { return length(p) - s; }

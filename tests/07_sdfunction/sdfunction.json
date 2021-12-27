@@ -222,7 +222,7 @@
       ]
     },
     {
-      "name": "box1",
+      "name": "box1_light",
       "type": "box",
       "whd": [ 0.5, 0.4, 0.00001 ],
       "material": 1,
@@ -244,7 +244,7 @@
     {
       "name": "capped_cone1",
       "type": "capped_cone",
-      "height": 0.15,
+      "height": 0.1,
       "r1": 0.1,
       "r2": 0.02,
       "material": 6,
@@ -259,7 +259,7 @@
         0.0,
         1.0,
         -0.1,
-        0.0,
+        -0.1,
         0.0
       ]
     },

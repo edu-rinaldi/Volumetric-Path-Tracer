@@ -3692,10 +3692,10 @@ static bool load_json_scene(
             break;
           }
           case sdf_type::box: {
-            vec3f whd;
-            get_opt(element, "whd", whd);
-            sdf.f = [whd](const vec3f& p) {
-              return sd_box(p - (whd * 0.5f), whd * 0.5f);
+            get_opt(element, "whd", sdf.whd);
+            sdf.f = [sdf](const vec3f& p) {
+                // Divide by two because sd_box is designed with origin at the center of the box, size is half width/height/depth
+                return sd_box(p - (sdf.whd * 0.5f), sdf.whd * 0.5f);
             };
             break;
           }

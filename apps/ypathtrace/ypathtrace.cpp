@@ -239,8 +239,13 @@ void run_interactive(const string& filename, const string& output,
       edited += draw_glslider("samples", tparams.samples, 16, 4096);
       edited += draw_glcombobox(
           "shader", (int&)tparams.shader, pathtrace_shader_names);
-      if (tparams.shader == pathtrace_shader_type::implicit)
-        edited += draw_glcheckbox("Implicit MIS", tparams.implicit_mis);
+      if (tparams.shader == pathtrace_shader_type::implicit) {
+        edited += draw_glcheckbox(
+            "Disable implicit MIS", tparams.noimplicit_mis);
+      }
+      if (tparams.shader == pathtrace_shader_type::implicit || tparams.shader == pathtrace_shader_type::implicit_normal)
+        edited += draw_glslider(
+            "spheretrace max iterations", tparams.spheretrace_maxiter, 1, 512);
       edited += draw_glslider("bounces", tparams.bounces, 1, 128);
       continue_glline();
       edited += draw_glslider("pratio", tparams.pratio, 1, 64);
@@ -318,7 +323,9 @@ void run(const vector<string>& args) {
   add_option(cli, "samples", params.samples, "Number of samples.", {1, 4096});
   add_option(cli, "bounces", params.bounces, "Number of bounces.", {1, 128});
   add_option(cli, "noparallel", params.noparallel, "Disable threading.");
-  add_option(cli, "implicitmis", params.implicit_mis, "Enable MIS on implicit shader");
+  add_option(cli, "noimplicitmis", params.noimplicit_mis, "Disable MIS on implicit shader");
+  add_option(cli, "stmaxiter", params.spheretrace_maxiter,
+      "Number of maximum iteration while spheretracing", {1, 512});
   parse_cli(cli, args);
 
   // run
