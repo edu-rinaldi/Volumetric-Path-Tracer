@@ -15,8 +15,8 @@ typedef std::function<float(const vec3f&)> sdf;
 
 struct sdf_result {
   float result = flt_max;       // Distance to nearest sdf (either volume or sdfunction)
-  int   instance = invalidid;   // handle to nearest volume instance
-  int   sdf      = invalidid;   // handle to nearest sdfunction object
+  int   instance = invalidid;   // handle to nearest sdf grid instance
+  int   sdf      = invalidid;   // handle to nearest sdfunction
 };
 
 // SDFunction predefined types

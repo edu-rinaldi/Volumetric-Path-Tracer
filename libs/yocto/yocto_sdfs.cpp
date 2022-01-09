@@ -6,18 +6,19 @@ namespace yocto {
 // Eval all the SDFs in the scene at a given point p
 sdf_result eval_sdf_scene(const scene_data& scene, const vec3f& p, float t) {
   sdf_result res;
-  // Evaluate sdf from grid
+  // Evaluate sdf grid
   for (const auto& [idx, instance] : enumerate(scene.vol_instances)) {
     const auto& volume       = scene.volumes[instance.volume];
     float       instance_sdf = eval_sdf(
         volume, instance, transform_point(instance.frame, p), t);
-
+    // keep the instance with min distance
     if (instance_sdf < res.result) res = {instance_sdf, (int)idx, invalidid};
   }
 
   // Evaluate sdf from function
   for (auto& [idx, sdfunc] : enumerate(scene.sdfs)) {
     auto sdf = sdfunc.f(transform_point(sdfunc.frame, p));
+    // keep the sdf with min distance
     if (sdf < res.result) res = {sdf, invalidid, (int)idx};
   }
 
@@ -47,9 +48,10 @@ float eval_sdf(const volume<float>& volume, const volume_instance& instance,
   return bbox_dist;
 }
 
-// Eval normal given the scene
+// Eval normal given the scene (avoid using it, it's quite expensive)
+// https://iquilezles.org/www/articles/normalsSDF/normalsSDF.htm
 vec3f eval_sdf_normal(const scene_data& scene, const vec3f& p, float t) {
-  const float h  = yocto::flt_eps * t;  // replace by an appropriate value
+  const float h  = yocto::flt_eps * t;  // can be replaced by another appropriate value
   auto        p1 = p + vec3f{1, -1, -1} * h;
   auto        p2 = p + vec3f{-1, -1, 1} * h;
   auto        p3 = p + vec3f{-1, 1, -1} * h;
@@ -61,8 +63,9 @@ vec3f eval_sdf_normal(const scene_data& scene, const vec3f& p, float t) {
 }
 
 // Eval the normal of a sdfunction
+// https://iquilezles.org/www/articles/normalsSDF/normalsSDF.htm
 vec3f eval_sdf_normal(const sdf_data& sdf, const vec3f& p, float t) {
-  const float h = yocto::flt_eps * t;  // replace by an appropriate value
+  const float h = yocto::flt_eps * t;  // can be replaced by another appropriate value
   auto        p1 = transform_point(sdf.frame, p + vec3f{1, -1, -1} * h);
   auto        p2 = transform_point(sdf.frame, p + vec3f{-1, -1, 1} * h);
   auto        p3 = transform_point(sdf.frame, p + vec3f{-1, 1, -1} * h);
@@ -70,10 +73,11 @@ vec3f eval_sdf_normal(const sdf_data& sdf, const vec3f& p, float t) {
   return normalize(vec3f{1, -1, -1} * sdf.f(p1) + vec3f{-1, -1, 1} * sdf.f(p2) +
                    vec3f{-1, 1, -1} * sdf.f(p3) + vec3f{1, 1, 1} * sdf.f(p4));
 }
-// Eval normal of sdfields
+// Eval normal of sdf grid
+// https://iquilezles.org/www/articles/normalsSDF/normalsSDF.htm
 vec3f eval_sdf_normal(const volume<float>& volume,
     const volume_instance& instance, const vec3f& p, float t) {
-  const float h = yocto::flt_eps * t;  // replace by an appropriate value
+  const float h = yocto::flt_eps * t;  // can be replaced by another appropriate value
   auto        p1 = transform_point(instance.frame, p + vec3f{1, -1, -1} * h);
   auto        p2 = transform_point(instance.frame, p + vec3f{-1, -1, 1} * h);
   auto        p3 = transform_point(instance.frame, p + vec3f{-1, 1, -1} * h);
