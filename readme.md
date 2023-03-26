@@ -5,7 +5,7 @@ For this homework the main objectives were to:
 - handle normal mapping,
 - write a path tracer with support for homogeneous volumes.
 - write a path tracer that uses sphere tracing for implicit surfaces
-- represents implicit surfaces using SDF both as actual functions and as voxel grid
+- represents implicit surfaces using SDF both as actual functions and as voxel grid.
 
 ## Framework
 
